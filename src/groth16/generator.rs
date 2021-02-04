@@ -204,6 +204,9 @@ pub fn generate_parameters<E, C>(
 
     // Synthesize the circuit.
     circuit.synthesize(&mut assembly)?;
+    println!("setup, num_constraints-{:?}", assembly.num_constraints);
+    println!("setup, num_inputs-{:?}", assembly.num_inputs);
+    println!("setup, num_aux-{:?}", assembly.num_aux);
 
     // Input constraints to ensure full density of IC query
     // x * 0 = 0

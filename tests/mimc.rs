@@ -257,7 +257,7 @@ fn test_mimc_bls12() {
     println!("Creating proofs...");
 
     // Let's benchmark stuff!
-    const SAMPLES: u32 = 1;
+    const SAMPLES: u32 = 10;
     let mut total_proving = Duration::new(0, 0);
     let mut total_verifying = Duration::new(0, 0);
 
@@ -342,7 +342,7 @@ fn test_mimc_bn256() {
 
     // Let's benchmark stuff!
     // const SAMPLES: u32 = 50;
-    const SAMPLES: u32 = 1;
+    const SAMPLES: u32 = 10;
     let mut total_proving = Duration::new(0, 0);
     let mut total_verifying = Duration::new(0, 0);
 

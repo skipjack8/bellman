@@ -28,7 +28,7 @@ use crate::kate_commitment::*;
 use self::better_cs::cs::{PlonkCsWidth4WithNextStepParams, PlonkConstraintSystemParams};
 use crate::plonk::commitments::transcript::*;
 use crate::plonk::fft::cooley_tukey_ntt::*;
-
+//1
 pub fn transpile<E: Engine, C: crate::Circuit<E>>(circuit: C) -> Result<Vec<(usize, TranspilationVariant)>, SynthesisError> {
     let mut transpiler = Transpiler::<E, PlonkCsWidth4WithNextStepParams>::new();
 
@@ -82,7 +82,7 @@ pub fn is_satisfied_using_one_shot_check<E: Engine, C: crate::Circuit<E>>(
         return Err(SynthesisError::Unsatisfiable);
     }
 }
-
+//2
 pub fn setup<E: Engine, C: crate::Circuit<E>>(
     circuit: C,
     hints: &Vec<(usize, TranspilationVariant)>
@@ -128,7 +128,7 @@ pub fn make_precomputations<E: Engine, P: PlonkConstraintSystemParams<E>>(
 
     Ok(precomputations)
 }
-
+//3
 pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
     circuit: C,
     hints: &Vec<(usize, TranspilationVariant)>,
