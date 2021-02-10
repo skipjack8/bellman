@@ -2324,3 +2324,119 @@ fn transpile_xor_and_prove_with_no_precomputations() {
     );
     proof.write(&mut proof_writer).unwrap();
 }
+
+#[test]
+fn transpile_xor_and_prove_with_no_precomputations_mimc() {
+    use crate::tests::MiMCDemo;
+    use crate::cs::Circuit;
+    use crate::pairing::bn256::{Bn256, Fr};
+    use super::test_assembly::*;
+    use super::cs::PlonkCsWidth4WithNextStepParams;
+    use super::generator::*;
+    use super::prover::*;
+    use crate::multicore::Worker;
+    use super::verifier::*;
+    use crate::kate_commitment::*;
+    use crate::plonk::commitments::transcript::*;
+    use crate::plonk::commitments::transcript::keccak_transcript::*;
+    use crate::plonk::fft::cooley_tukey_ntt::*;
+    use super::keys::*;
+    use crate::plonk::domains::Domain;
+    use super::utils::make_non_residues;
+    use rand::{thread_rng, Rng};
+
+    const MIMC_ROUNDS: usize = 1000000;
+
+    let rng = &mut thread_rng();
+
+    // Generate the MiMC round constants
+    let constants = (0..MIMC_ROUNDS).map(|_| rng.gen()).collect::<Vec<_>>();
+
+    let c = MiMCDemo::<Bn256> {
+        xl: None,
+        xr: None,
+        constants: &constants
+    };
+
+    let mut transpiler = Transpiler::<Bn256, PlonkCsWidth4WithNextStepParams>::new();
+
+    c.synthesize(&mut transpiler).expect("sythesize into traspilation must succeed");
+
+    let hints = transpiler.hints;
+
+    for (constraint_id, hint) in hints.iter() {
+        println!("Constraint {} into {:?}", constraint_id, hint);
+    }
+
+    // let c = XORDemo::<Bn256> {
+    //     a: None,
+    //     b: None,
+    //     _marker: PhantomData
+    // };
+    let a = rng.gen();
+    let b = rng.gen();
+    let c = MiMCDemo::<Bn256> {
+        xl: Some(a),
+        xr: Some(b),
+        constants: &constants
+    };
+
+    let adapted_curcuit = AdaptorCircuit::<Bn256, PlonkCsWidth4WithNextStepParams, _>::new(c.clone(), &hints);
+
+    let mut assembly = TestAssembly::<Bn256, PlonkCsWidth4WithNextStepParams>::new();
+    adapted_curcuit.synthesize(&mut assembly).expect("sythesize of transpiled into CS must succeed");
+    let num_gates = assembly.num_gates();
+    println!("Transpiled into {} gates", num_gates);
+
+    let adapted_curcuit = AdaptorCircuit::<Bn256, PlonkCsWidth4WithNextStepParams, _>::new(c.clone(), &hints);
+    let mut assembly = GeneratorAssembly4WithNextStep::<Bn256>::new();
+    adapted_curcuit.synthesize(&mut assembly).expect("sythesize of transpiled into CS must succeed");
+    assembly.finalize();
+
+    let worker = Worker::new();
+
+    let setup = assembly.setup(&worker).unwrap();
+
+    let crs_mons = Crs::<Bn256, CrsForMonomialForm>::crs_42(setup.permutation_polynomials[0].size(), &worker);
+
+    let verification_key = VerificationKey::from_setup(
+        &setup,
+        &worker,
+        &crs_mons
+    ).unwrap();
+
+    let size = setup.permutation_polynomials[0].size();
+
+    let domain = Domain::<Fr>::new_for_size(size as u64).unwrap();
+    let non_residues = make_non_residues::<Fr>(3, &domain);
+    println!("Non residues = {:?}", non_residues);
+
+    type Transcr = RollingKeccakTranscript<Fr>;
+
+    let proof = super::super::prove_by_steps::<_, _, Transcr>(
+        c,
+        &hints,
+        &setup,
+        None,
+        &crs_mons
+    ).unwrap();
+
+    let is_valid = verify::<Bn256, PlonkCsWidth4WithNextStepParams, Transcr>(&proof, &verification_key).unwrap();
+
+    assert!(is_valid);
+
+    // println!("Verification key = {:?}", verification_key);
+    // println!("Proof = {:?}", proof);
+
+    let mut key_writer = std::io::BufWriter::with_capacity(
+        1<<24,
+        std::fs::File::create("./xor_vk_mimc.key").unwrap()
+    );
+    verification_key.write(&mut key_writer).unwrap();
+
+    let mut proof_writer = std::io::BufWriter::with_capacity(
+        1<<24,
+        std::fs::File::create("./xor_proof_mimc.proof").unwrap()
+    );
+    proof.write(&mut proof_writer).unwrap();
+}

@@ -40,7 +40,7 @@ use bellman_ce::groth16::{
 
 // const MIMC_ROUNDS: usize = 322;
 
-const MIMC_ROUNDS: usize = 1000000;
+const MIMC_ROUNDS: usize = 322;
 
 
 #[cfg(feature = "marlin")]
@@ -257,7 +257,7 @@ fn test_mimc_bls12() {
     println!("Creating proofs...");
 
     // Let's benchmark stuff!
-    const SAMPLES: u32 = 10;
+    const SAMPLES: u32 = 1;
     let mut total_proving = Duration::new(0, 0);
     let mut total_verifying = Duration::new(0, 0);
 
