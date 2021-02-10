@@ -238,19 +238,19 @@ impl std::fmt::Debug for TranspilationVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TranspilationVariant::IntoQuadraticGate => {
-                writeln!(f, "Variant: into quadratic gate")?;
+                // writeln!(f, "Variant: into quadratic gate")?;
             },
             TranspilationVariant::IntoAdditionGate(_) => {
-                writeln!(f, "Variant: make an addition gate")?;
+                // writeln!(f, "Variant: make an addition gate")?;
             },
             TranspilationVariant::MergeLinearCombinations(merge_type, _) => {
-                writeln!(f, "Variant: merge linear combinations as {:?}", merge_type)?;
+                // writeln!(f, "Variant: merge linear combinations as {:?}", merge_type)?;
             },
             TranspilationVariant::IntoMultiplicationGate(b) => {
-                writeln!(f, "Variant: into combinatoric multiplication gate")?;
-                writeln!(f, "A: {:?}", b.0)?;
-                writeln!(f, "B: {:?}", b.1)?;
-                writeln!(f, "C: {:?}", b.2)?;
+                // writeln!(f, "Variant: into combinatoric multiplication gate")?;
+                // writeln!(f, "A: {:?}", b.0)?;
+                // writeln!(f, "B: {:?}", b.1)?;
+                // writeln!(f, "C: {:?}", b.2)?;
             },
         }
 
