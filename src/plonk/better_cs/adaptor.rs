@@ -280,21 +280,21 @@ fn allocate_into_cs<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConst
     coefficients: &[E::Fr]
 ) -> Result<(), SynthesisError> {
     if needs_next_step {
-        debug_assert!(coefficients.len() == P::STATE_WIDTH + 1 + 1 + 1);
+        debug_assert!(coefficients.len() == P::STATE_WIDTH + 1 + 1 + 1);//7
         debug_assert!(P::CAN_ACCESS_NEXT_TRACE_STEP);
 
         cs.new_gate(
-            P::StateVariables::from_variables(variables), 
-            P::ThisTraceStepCoefficients::from_coeffs(&coefficients[0..(P::STATE_WIDTH+2)]), 
+            P::StateVariables::from_variables(variables),
+            P::ThisTraceStepCoefficients::from_coeffs(&coefficients[0..(P::STATE_WIDTH+2)]),
             P::NextTraceStepCoefficients::from_coeffs(&coefficients[(P::STATE_WIDTH+2)..])
         )?;
     } else {
-        debug_assert!(coefficients.len() >= P::STATE_WIDTH + 1 + 1);
+        debug_assert!(coefficients.len() >= P::STATE_WIDTH + 1 + 1);//6
         debug_assert!(coefficients.last().unwrap().is_zero());
 
         cs.new_gate(
-            P::StateVariables::from_variables(variables), 
-            P::ThisTraceStepCoefficients::from_coeffs(&coefficients[0..(P::STATE_WIDTH+2)]), 
+            P::StateVariables::from_variables(variables),
+            P::ThisTraceStepCoefficients::from_coeffs(&coefficients[0..(P::STATE_WIDTH+2)]),
             P::NextTraceStepCoefficients::from_coeffs(&coefficients[(P::STATE_WIDTH+2)..])
         )?;
     }
@@ -304,8 +304,8 @@ fn allocate_into_cs<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConst
 
 fn evaluate_lc<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem<E, P>>(
     cs: &CS,
-    lc: &LinearCombination<E>,  
-    // multiplier: E::Fr, 
+    lc: &LinearCombination<E>,
+    // multiplier: E::Fr,
     free_term_constant: E::Fr
 ) -> Result<E::Fr, SynthesisError> {
     let mut final_value = E::Fr::zero();
@@ -353,7 +353,7 @@ fn evaluate_over_plonk_variables<E: Engine, P: PlonkConstraintSystemParams<E>, C
 
     Ok(final_value)
 }
-
+// 计算 lc的值
 fn evaluate_over_plonk_variables_and_coeffs<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem<E, P>>(
     cs: &CS,
     variables: &[PlonkVariable],
@@ -372,14 +372,14 @@ fn evaluate_over_plonk_variables_and_coeffs<E: Engine, P: PlonkConstraintSystemP
 
     Ok(final_value)
 }
-
+//r1cs -> plonk gate
 fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem<E, P>>(
-    cs: &mut CS, 
-    mut lc: LinearCombination<E>,  
-    multiplier: E::Fr, 
+    cs: &mut CS,
+    mut lc: LinearCombination<E>,
+    multiplier: E::Fr, //非0
     free_term_constant: E::Fr,
-    collapse_into_single_variable: bool,
-    scratch_space: &mut TranspilationScratchSpace<E>,
+    collapse_into_single_variable: bool,//是否合并成一个变量
+    scratch_space: &mut TranspilationScratchSpace<E>, // 存储空间，传入为空
 ) -> Result<(Option<PlonkVariable>, E::Fr, LcTransformationVariant), SynthesisError> {
     assert!(P::CAN_ACCESS_NEXT_TRACE_STEP, "Transliper only works for proof systems with access to next step");
 
@@ -396,27 +396,29 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
 
     assert!(lc.0.len() > 0);
 
-    if lc.0.len() == 1 {
-        if free_term_constant.is_zero() {
+    if lc.0.len() == 1 {//lc只有一对<Variable, E::Fr>
+        if free_term_constant.is_zero() {//没有常数项
             // this linear combination contains only one variable and no constant
-            // term, so we just leave it as is, 
+            // term, so we just leave it as is,
             // but ONLY if we just need to collapse LC into a variable
-            if collapse_into_single_variable {
+            if collapse_into_single_variable {//lc转变成变量
                 let (var, coeff) = lc.0[0];
 
                 return Ok((Some(convert_variable(var)), coeff, LcTransformationVariant::IsSingleVariable));
             }
-        } 
+        }
     }
 
     // everything else should be handled here by making a new variable
+    // 在只有一个<Variable, E::Fr>而且允许合并成一个变量的情况下，合并成一个变量并返回；
+    // 如果不是，则需要分配新的变量，将整个lc的结果赋予一个变量。
 
     // scale if necessary
     if multiplier.is_zero() {
         assert!(free_term_constant.is_zero());
         unreachable!();
         // it's a constraint 0 * LC = 0
-    } else {
+    } else {//将multiplier 乘到每个lc的系数里，这样在下面只考虑lc就可以。
         if multiplier != one_fr {
             for (_, c) in lc.0.iter_mut() {
                 c.mul_assign(&multiplier);
@@ -424,10 +426,10 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
         }
     }
 
-    // if we need to collaplse an LC into a single variable for 
+    // if we need to collaplse an LC into a single variable for
     // future use we allocate it and then subtract it from linear combination
     // to have an enforcement LC == 0 in all the cases
-
+    // 计算lc的值，并分配一个新的变量
     let final_variable = if collapse_into_single_variable {
         let may_be_new_value = evaluate_lc::<E, P, CS>(&*cs, &lc, free_term_constant);
         let new_var = cs.alloc(|| {
@@ -438,23 +440,23 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
     } else {
         None
     };
-
+    // 如果允许合成一个变量，lc.push((final_variable, -1)),此时lc.value=0
     if let Some(var) = final_variable {
         subtract_variable_unchecked(&mut lc, convert_variable_back(var));
     }
 
     let num_terms = lc.0.len();
 
-    // we have two options: 
+    // we have two options:
     // - fit everything into a single gate (in case of number terms in the linear combination
     // smaller than a width of the state)
     // - make a required number of extra variables and chain it
-    
-    if num_terms <= P::STATE_WIDTH {
+    // lc中变量个数少于4的话，只需要转变为一个plonk门就可以。
+    if num_terms <= P::STATE_WIDTH {//
         // we can just make a single gate
 
-        // fill the gate with nothing first and replace after
-        scratch_space.scratch_space_for_vars.resize(P::STATE_WIDTH, cs.get_dummy_variable());
+        // 先用默认值填充，再修改相应的值
+        scratch_space.scratch_space_for_vars.resize(P::STATE_WIDTH, cs.get_dummy_variable());//Variable(Index::Aux(0))，无意义
         scratch_space.scratch_space_for_booleans.resize(P::STATE_WIDTH, false);
         scratch_space.scratch_space_for_coeffs.resize(P::STATE_WIDTH, zero_fr);
 
@@ -462,7 +464,7 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
 
         // we can consume and never have leftovers
         let mut idx = 0;
-        for (var, coeff) in it {
+        for (var, coeff) in it {//lc的变量放到scratch_space中
             if scratch_space.scratch_space_for_booleans[idx] == false {
                 scratch_space.scratch_space_for_booleans[idx] = true;
                 scratch_space.scratch_space_for_coeffs[idx] = coeff;
@@ -470,7 +472,7 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
                 idx += 1;
             }
         }
-
+        //q_a(x)a(x)+q_b(x)b(x)+q_c(x)c(x)+q_d(x)d(x)+qm(x)a(x)b(x)+q_const(x)+q_d_next d(xw)=0
         // add multiplication coefficient, constant and next step one
 
         scratch_space.scratch_space_for_coeffs.push(zero_fr);
@@ -478,9 +480,9 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
         scratch_space.scratch_space_for_coeffs.push(zero_fr);
 
         allocate_into_cs(
-            cs, 
-            false, 
-            &*scratch_space.scratch_space_for_vars, 
+            cs,
+            false,
+            &*scratch_space.scratch_space_for_vars,
             &*scratch_space.scratch_space_for_coeffs
         )?;
 
@@ -489,26 +491,27 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
         let hint = LcTransformationVariant::IntoSingleGate;
 
         return Ok((final_variable, one_fr, hint));
-    } else {
+    } else {//
         // we can take:
         // - STATE_WIDTH variables to form the first gate and place their sum into the last wire of the next gate
         // - every time take STATE_WIDTH-1 variables and place their sum + last wire into the next gate last wire
 
         // we have also made a final variable already, so there is NO difference
-        let cycles = ((lc.0.len() - P::STATE_WIDTH) + (P::STATE_WIDTH - 2)) / (P::STATE_WIDTH - 1); // ceil 
+        //拆分成几个gate，不包含第一个。
+        let cycles = ((lc.0.len() - P::STATE_WIDTH) + (P::STATE_WIDTH - 2)) / (P::STATE_WIDTH - 1); // ceil
         let mut it = lc.0.into_iter();
 
-        // this is a placeholder variable that must go into the 
-        // corresponding trace polynomial at the NEXT time step 
+        // this is a placeholder variable that must go into the
+        // corresponding trace polynomial at the NEXT time step
         let mut next_step_var_in_chain = {
             scratch_space.scratch_space_for_vars.resize(P::STATE_WIDTH, cs.get_dummy_variable());
             scratch_space.scratch_space_for_booleans.resize(P::STATE_WIDTH, false);
             scratch_space.scratch_space_for_coeffs.resize(P::STATE_WIDTH, zero_fr);
-    
+
             // we can consume and never have leftovers
-    
+
             let mut idx = 0;
-            for (var, coeff) in &mut it {
+            for (var, coeff) in &mut it {//先取前4个
                 if scratch_space.scratch_space_for_booleans[idx] == false {
                     scratch_space.scratch_space_for_booleans[idx] = true;
                     scratch_space.scratch_space_for_coeffs[idx] = coeff;
@@ -522,10 +525,11 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
 
             // for a P::STATE_WIDTH variables we make a corresponding LC
             // ~ a + b + c + d + constant. That will be equal to d_next
+            // 计算a+b+c+d+const， 并分配一个新变量
             let may_be_new_intermediate_value = evaluate_over_plonk_variables_and_coeffs::<E, P, CS>(
                 &*cs,
                 &*scratch_space.scratch_space_for_vars,
-                &*scratch_space.scratch_space_for_coeffs, 
+                &*scratch_space.scratch_space_for_coeffs,
                 free_term_constant
             );
 
@@ -539,11 +543,11 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
             scratch_space.scratch_space_for_coeffs.push(zero_fr); // no multiplication
             scratch_space.scratch_space_for_coeffs.push(free_term_constant); // add constant
             scratch_space.scratch_space_for_coeffs.push(minus_one_fr); // -1 for a d_next
-
+            // a + b + c + d + const - new_intermediate_var = 0
             allocate_into_cs(
-                cs, 
-                true, 
-                &*scratch_space.scratch_space_for_vars, 
+                cs,
+                true,
+                &*scratch_space.scratch_space_for_vars,
                 &*scratch_space.scratch_space_for_coeffs
             )?;
 
@@ -554,16 +558,16 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
 
         // run over the rest
 
-        // we can only take one less cause 
+        // we can only take one less cause
         // we've already used one of the variable
-        let consume_from_lc = P::STATE_WIDTH - 1; 
+        let consume_from_lc = P::STATE_WIDTH - 1;
         for _ in 0..(cycles-1) {
             scratch_space.scratch_space_for_vars.resize(consume_from_lc, cs.get_dummy_variable());
             scratch_space.scratch_space_for_booleans.resize(consume_from_lc, false);
             scratch_space.scratch_space_for_coeffs.resize(consume_from_lc, zero_fr);
-    
+
             // we can consume and never have leftovers
-    
+
             let mut idx = 0;
             for (var, coeff) in &mut it {
                 if scratch_space.scratch_space_for_booleans[idx] == false {
@@ -585,7 +589,7 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
             let may_be_new_intermediate_value = evaluate_over_plonk_variables_and_coeffs::<E, P, CS>(
                 &*cs,
                 &*scratch_space.scratch_space_for_vars,
-                &*scratch_space.scratch_space_for_coeffs, 
+                &*scratch_space.scratch_space_for_coeffs,
                 zero_fr
             );
 
@@ -600,9 +604,9 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
             scratch_space.scratch_space_for_coeffs.push(minus_one_fr);
 
             allocate_into_cs(
-                cs, 
-                true, 
-                &*scratch_space.scratch_space_for_vars, 
+                cs,
+                true,
+                &*scratch_space.scratch_space_for_vars,
                 &*scratch_space.scratch_space_for_coeffs
             )?;
 
@@ -616,9 +620,9 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
             scratch_space.scratch_space_for_vars.resize(P::STATE_WIDTH-1, cs.get_dummy_variable());
             scratch_space.scratch_space_for_booleans.resize(P::STATE_WIDTH-1, false);
             scratch_space.scratch_space_for_coeffs.resize(P::STATE_WIDTH-1, zero_fr);
-    
+
             // we can consume and never have leftovers
-    
+
             let mut idx = 0;
             for (var, coeff) in &mut it {
                 if scratch_space.scratch_space_for_booleans[idx] == false {
@@ -640,9 +644,9 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
             scratch_space.scratch_space_for_coeffs.push(zero_fr);
 
             allocate_into_cs(
-                cs, 
-                false, 
-                &*scratch_space.scratch_space_for_vars, 
+                cs,
+                false,
+                &*scratch_space.scratch_space_for_vars,
                 &*scratch_space.scratch_space_for_coeffs
             )?;
 
@@ -653,7 +657,7 @@ fn enforce_lc_as_gates<E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkCo
 
         let hint = LcTransformationVariant::IntoMultipleGates;
 
-        return Ok((final_variable, one_fr, hint));   
+        return Ok((final_variable, one_fr, hint));
     }
 }
 
@@ -696,11 +700,11 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> Transpiler<E, P> {
 impl<E: Engine, P: PlonkConstraintSystemParams<E>> PlonkConstraintSystem<E, P> for Transpiler<E, P> {
     fn alloc<F>(&mut self, value: F) -> Result<PlonkVariable, SynthesisError>
     where
-        F: FnOnce() -> Result<E::Fr, SynthesisError> 
+        F: FnOnce() -> Result<E::Fr, SynthesisError>
     {
         let var = crate::ConstraintSystem::<E>::alloc(
             self,
-            || "alloc aux var", 
+            || "alloc aux var",
         value)?;
 
         Ok(convert_variable(var))
@@ -709,11 +713,11 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> PlonkConstraintSystem<E, P> f
     // allocate an input variable
     fn alloc_input<F>(&mut self, value: F) -> Result<PlonkVariable, SynthesisError>
     where
-        F: FnOnce() -> Result<E::Fr, SynthesisError> 
+        F: FnOnce() -> Result<E::Fr, SynthesisError>
     {
         let var = crate::ConstraintSystem::<E>::alloc_input(
             self,
-            || "alloc input var", 
+            || "alloc input var",
         value)?;
 
         self.n += 1;
@@ -721,8 +725,8 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> PlonkConstraintSystem<E, P> f
         Ok(convert_variable(var))
     }
 
-    fn new_gate(&mut self, 
-        _variables: P::StateVariables, 
+    fn new_gate(&mut self,
+        _variables: P::StateVariables,
         _this_step_coeffs: P::ThisTraceStepCoefficients,
         _next_step_coeffs: P::NextTraceStepCoefficients
     ) -> Result<(), SynthesisError> {
@@ -740,11 +744,11 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> PlonkConstraintSystem<E, P> f
 impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>> PlonkConstraintSystem<E, P> for &'a mut Transpiler<E, P> {
     fn alloc<F>(&mut self, value: F) -> Result<PlonkVariable, SynthesisError>
     where
-        F: FnOnce() -> Result<E::Fr, SynthesisError> 
+        F: FnOnce() -> Result<E::Fr, SynthesisError>
     {
         let var = crate::ConstraintSystem::<E>::alloc(
             self,
-            || "alloc aux var", 
+            || "alloc aux var",
         value)?;
 
         Ok(convert_variable(var))
@@ -753,11 +757,11 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>> PlonkConstraintSystem<E, 
     // allocate an input variable
     fn alloc_input<F>(&mut self, value: F) -> Result<PlonkVariable, SynthesisError>
     where
-        F: FnOnce() -> Result<E::Fr, SynthesisError> 
+        F: FnOnce() -> Result<E::Fr, SynthesisError>
     {
         let var = crate::ConstraintSystem::<E>::alloc_input(
             self,
-            || "alloc input var", 
+            || "alloc input var",
         value)?;
 
         self.n += 1;
@@ -765,8 +769,8 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>> PlonkConstraintSystem<E, 
         Ok(convert_variable(var))
     }
 
-    fn new_gate(&mut self, 
-        _variables: P::StateVariables, 
+    fn new_gate(&mut self,
+        _variables: P::StateVariables,
         _this_step_coeffs: P::ThisTraceStepCoefficients,
         _next_step_coeffs: P::NextTraceStepCoefficients
     ) -> Result<(), SynthesisError> {
@@ -780,7 +784,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>> PlonkConstraintSystem<E, 
         PlonkVariable::new_unchecked(PlonkIndex::Aux(0))
     }
 }
-
+// imple CS for Transpiler
 impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> for Transpiler<E, P>
 {
     type Root = Self;
@@ -839,7 +843,7 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
         let (b_has_constant, b_constant_term, b_lc_is_empty, b_lc) = deduplicate_and_split_linear_term::<E, Self>(b(crate::LinearCombination::zero()), &mut self.deduplication_scratch);
         let (c_has_constant, c_constant_term, c_lc_is_empty, c_lc) = deduplicate_and_split_linear_term::<E, Self>(c(crate::LinearCombination::zero()), &mut self.deduplication_scratch);
 
-        let a_is_constant = a_has_constant & a_lc_is_empty;
+        let a_is_constant = a_has_constant & a_lc_is_empty;// 没有lc只有常数
         let b_is_constant = b_has_constant & b_lc_is_empty;
         let c_is_constant = c_has_constant & c_lc_is_empty;
 
@@ -851,11 +855,11 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
             (true, true, true) => {
                 unreachable!("R1CS has a gate 1 * 1 = 1");
             },
-            (true, false, true) | (false, true, true) => {
+            (true, false, true) | (false, true, true) => {//c0 * LC = c1
                 // println!("C * LC = C");
                 // we have something like c0 * LC = c1
                 // do we form an "addition gate", that may take more than
-                // one gate itself
+                // one gate itself，`constant * (x+y) = constant`
                 let lc = if !a_is_constant {
                     a_lc
                 } else if !b_is_constant {
@@ -879,7 +883,7 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
                 } else {
                     unreachable!("Either A or B LCs are constant");
                 };
-
+                //整个门电路中的常数项合并
                 free_constant_term.mul_assign(&multiplier);
                 free_constant_term.sub_assign(&c_constant_term);
 
@@ -904,7 +908,7 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
 
                 return;
             },
-            (false, false, true) => {
+            (false, false, true) => {// lc * lc = const
                 // println!("LC * LC = C");    
                 // potential quadatic gate, but ig general
                 // it's a full multiplication gate
@@ -1091,8 +1095,8 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
                 // LC * LC = LC
                 // potentially it can still be quadratic
                 let (is_quadratic_gate, _coeffs) = is_quadratic_gate::<E, Self>(
-                    &a_lc, 
-                    &b_lc, 
+                    &a_lc,
+                    &b_lc,
                     &c_lc, &mut self.scratch);
                 if is_quadratic_gate {
                     let current_lc_number = self.increment_lc_number();
@@ -1112,7 +1116,7 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
                 // rewrite into addition gates and multiplication gates
 
                 let mut space = self.transpilation_scratch_space.take().unwrap();
-                
+
                 let (_new_a_var, _, hint_a) = enforce_lc_as_gates(
                     self,
                     a_lc,
@@ -1151,7 +1155,7 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
 
                 self.hints.push((current_lc_number, hint));
             }
-        }  
+        }
     }
 
     fn push_namespace<NR, N>(&mut self, _: N)
@@ -1176,13 +1180,13 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
 use crate::{LinearCombination, ConstraintSystem, Variable};
 
 fn is_quadratic_gate<E: Engine, CS: ConstraintSystem<E>>(
-    a: &LinearCombination<E>, 
-    b: &LinearCombination<E>, 
+    a: &LinearCombination<E>,
+    b: &LinearCombination<E>,
     c: &LinearCombination<E>,
     scratch: &mut HashSet::<crate::cs::Variable>
 ) -> (bool, (E::Fr, E::Fr, E::Fr)) {
     let zero = E::Fr::zero();
-    
+
     let (_a_containts_constant, a_constant_coeff) = get_constant_term::<E, CS>(&a);
     let (_b_containts_constant, b_constant_coeff) = get_constant_term::<E, CS>(&b);
     let (_c_containts_constant, c_constant_coeff) = get_constant_term::<E, CS>(&c);
@@ -1307,7 +1311,7 @@ fn check_for_quadratic_gate<E: Engine>(
         }
 
         return (true, (constant_term, linear_term, quadratic_term));
-    } 
+    }
 
     (false, (zero, zero, zero))
 }
@@ -1317,7 +1321,7 @@ fn is_constant<E: Engine, CS: ConstraintSystem<E>>(lc: &LinearCombination<E>) ->
     if lc.as_ref().len() == 0 {
         return (true, E::Fr::zero());
     }
-    
+
     let result = get_constant_term::<E, CS>(&lc);
 
     if result.0 && lc.as_ref().len() == 1 {
@@ -1329,7 +1333,7 @@ fn is_constant<E: Engine, CS: ConstraintSystem<E>>(lc: &LinearCombination<E>) ->
 
 fn get_constant_term<E: Engine, CS: ConstraintSystem<E>>(lc: &LinearCombination<E>) -> (bool, E::Fr) {
     let cs_one = CS::one();
-    
+
     for (var, coeff) in lc.as_ref().iter() {
         if var == &cs_one {
             return (true, *coeff);
@@ -1341,7 +1345,7 @@ fn get_constant_term<E: Engine, CS: ConstraintSystem<E>>(lc: &LinearCombination<
 
 fn get_first_variable<E: Engine, CS: ConstraintSystem<E>>(lc: &LinearCombination<E>) -> (bool, Variable) {
     let cs_one = CS::one();
-    
+
     for (var, _) in lc.as_ref().iter() {
         if var != &cs_one {
             return (true, *var);
@@ -1353,7 +1357,7 @@ fn get_first_variable<E: Engine, CS: ConstraintSystem<E>>(lc: &LinearCombination
 
 fn get_first_variable_with_coeff<E: Engine, CS: ConstraintSystem<E>>(lc: &LinearCombination<E>) -> (bool, Variable, E::Fr) {
     let cs_one = CS::one();
-    
+
     for (var, coeff) in lc.as_ref().iter() {
         if var != &cs_one {
             return (true, *var, *coeff);
@@ -1367,7 +1371,7 @@ fn num_unique_values<E: Engine, CS: ConstraintSystem<E>>(lc: &LinearCombination<
     let cs_one = CS::one();
 
     debug_assert!(scratch.is_empty());
-    
+
     let mut contains_constant = false;
 
     for (var, _) in lc.as_ref().iter() {
@@ -1389,7 +1393,7 @@ fn is_linear_term<E: Engine, CS: ConstraintSystem<E>>(lc: &LinearCombination<E>,
     let cs_one = CS::one();
 
     debug_assert!(scratch.is_empty());
-    
+
     let mut linear_coeff = E::Fr::zero();
 
     for (var, coeff) in lc.as_ref().iter() {
@@ -1410,7 +1414,7 @@ fn is_linear_term<E: Engine, CS: ConstraintSystem<E>>(lc: &LinearCombination<E>,
         scratch.clear();
 
         return (false, cs_one, E::Fr::zero())
-    }    
+    }
 }
 
 fn deduplicate_stable<E: Engine, CS: ConstraintSystem<E>>(
@@ -1452,7 +1456,7 @@ fn deduplicate_stable<E: Engine, CS: ConstraintSystem<E>>(
 
     LinearCombination(deduped_vec)
 }
-
+//(a_has_constant, a_constant_term, a_lc_is_empty, a_lc)
 fn deduplicate_and_split_linear_term<E: Engine, CS: ConstraintSystem<E>>(
     lc: LinearCombination<E>,
     scratch: &mut HashMap<crate::cs::Variable, usize>
@@ -1470,10 +1474,10 @@ fn deduplicate_and_split_linear_term<E: Engine, CS: ConstraintSystem<E>>(
 
     for (var, coeff) in lc.0.into_iter() {
         if var != cs_one {
-            if let Some(existing_index) = scratch.get(&var) {
+            if let Some(existing_index) = scratch.get(&var) {//同一个变量，合并系数
                 let (_, c) = &mut deduped_vec[*existing_index];
                 c.add_assign(&coeff);
-            } else {
+            } else {//非同一个变量
                 let new_idx = deduped_vec.len();
                 deduped_vec.push((var, coeff));
                 scratch.insert(var, new_idx);
@@ -1482,7 +1486,7 @@ fn deduplicate_and_split_linear_term<E: Engine, CS: ConstraintSystem<E>>(
             constant_term.add_assign(&coeff);
         }
     }
-
+    //去掉系数为0的情况
     deduped_vec = deduped_vec.into_iter().filter(|(_var, coeff)| !coeff.is_zero()).collect();
 
     scratch.clear();
@@ -1662,8 +1666,8 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
         let mut minus_one_fr = E::Fr::one();
         minus_one_fr.negate();
 
-        let (_, hint) = { 
-            self.get_next_hint() 
+        let (_, hint) = {
+            self.get_next_hint()
         };
 
         let _hint = hint.clone();
@@ -1702,10 +1706,10 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
                 };
 
                 let (is_quadratic, coeffs) = check_for_quadratic_gate(
-                    &a_lc, 
-                    &b_lc, 
-                    &c_lc, 
-                    a_constant_term, 
+                    &a_lc,
+                    &b_lc,
+                    &c_lc,
+                    a_constant_term,
                     b_constant_term,
                     c_constant_term
                 );
@@ -1728,7 +1732,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
 
                 allocate_into_cs(
                     self.cs,
-                    false, 
+                    false,
                     &*space.scratch_space_for_vars,
                     &*space.scratch_space_for_coeffs
                 ).expect("must make a quadratic gate");
@@ -1844,7 +1848,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
 
                     allocate_into_cs(
                         self.cs,
-                        false, 
+                        false,
                         &*space.scratch_space_for_vars,
                         &*space.scratch_space_for_coeffs
                     ).expect("must make a multiplication gate with C being constant");
@@ -1870,7 +1874,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
 
                     allocate_into_cs(
                         self.cs,
-                        false, 
+                        false,
                         &*space.scratch_space_for_vars,
                         &*space.scratch_space_for_coeffs
                     ).expect("must make a plain multiplication gate");
@@ -1889,7 +1893,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
                     } else {
                         unreachable!("Either A or B LCs are constant");
                     };
-    
+
                     let multiplier = if a_is_constant {
                         a_constant_term
                     } else if b_is_constant {
@@ -1897,7 +1901,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
                     } else {
                         unreachable!("Must take multiplier from A or B");
                     };
-    
+
                     let mut free_constant_term = if a_is_constant {
                         b_constant_term
                     } else if b_is_constant {
@@ -1905,10 +1909,10 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
                     } else {
                         unreachable!("Either A or B LCs are constant");
                     };
-    
+
                     free_constant_term.mul_assign(&multiplier);
                     free_constant_term.sub_assign(&c_constant_term);
-    
+
                     let (_, _, _variant) = enforce_lc_as_gates(
                         self.cs,
                         lc,
@@ -1967,7 +1971,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
 
                         subtract_lcs_with_dedup_stable::<E, Self>(final_lc, c_lc, &mut self.deduplication_scratch)
                         // final_lc - &c
-                    },  
+                    },
                     MergeLcVariant::CIsTheOnlyMeaningful => {
                         free_constant_term = a_constant_term;
                         free_constant_term.mul_assign(&b_constant_term);
@@ -2006,7 +2010,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
                 };
             }
         }
-        
+
         space.clear();
         self.transpilation_scratch_space = Some(space);
     }
@@ -2060,8 +2064,8 @@ pub struct AdaptorCircuit<'a, E:Engine, P: PlonkConstraintSystemParams<E>, C: cr
 }
 
 impl<'a, E:Engine, P: PlonkConstraintSystemParams<E>, C: crate::Circuit<E>> AdaptorCircuit<'a, E, P, C> {
-    pub fn new<'b>(circuit: C, hints: &'b Vec<(usize, TranspilationVariant)>) -> Self 
-        where 'b: 'a 
+    pub fn new<'b>(circuit: C, hints: &'b Vec<(usize, TranspilationVariant)>) -> Self
+        where 'b: 'a
     {
         Self {
             circuit: Cell::new(Some(circuit)),
@@ -2159,13 +2163,13 @@ fn transpile_xor_using_new_adaptor() {
     let crs_vals = Crs::<Bn256, CrsForLagrangeForm>::crs_42(setup.permutation_polynomials[0].size(), &worker);
 
     let verification_key = VerificationKey::from_setup(
-        &setup, 
-        &worker, 
+        &setup,
+        &worker,
         &crs_mons
     ).unwrap();
 
     let precomputations = SetupPolynomialsPrecomputations::from_setup(
-        &setup, 
+        &setup,
         &worker
     ).unwrap();
 
@@ -2206,13 +2210,13 @@ fn transpile_xor_using_new_adaptor() {
     // println!("Proof = {:?}", proof);
 
     let mut key_writer = std::io::BufWriter::with_capacity(
-        1<<24, 
+        1<<24,
         std::fs::File::create("./xor_vk.key").unwrap()
     );
     verification_key.write(&mut key_writer).unwrap();
 
     let mut proof_writer = std::io::BufWriter::with_capacity(
-        1<<24, 
+        1<<24,
         std::fs::File::create("./xor_proof.proof").unwrap()
     );
     proof.write(&mut proof_writer).unwrap();
@@ -2284,8 +2288,8 @@ fn transpile_xor_and_prove_with_no_precomputations() {
     let crs_mons = Crs::<Bn256, CrsForMonomialForm>::crs_42(setup.permutation_polynomials[0].size(), &worker);
 
     let verification_key = VerificationKey::from_setup(
-        &setup, 
-        &worker, 
+        &setup,
+        &worker,
         &crs_mons
     ).unwrap();
 
@@ -2313,13 +2317,13 @@ fn transpile_xor_and_prove_with_no_precomputations() {
     // println!("Proof = {:?}", proof);
 
     let mut key_writer = std::io::BufWriter::with_capacity(
-        1<<24, 
+        1<<24,
         std::fs::File::create("./xor_vk.key").unwrap()
     );
     verification_key.write(&mut key_writer).unwrap();
 
     let mut proof_writer = std::io::BufWriter::with_capacity(
-        1<<24, 
+        1<<24,
         std::fs::File::create("./xor_proof.proof").unwrap()
     );
     proof.write(&mut proof_writer).unwrap();
@@ -2345,7 +2349,7 @@ fn transpile_xor_and_prove_with_no_precomputations_mimc() {
     use super::utils::make_non_residues;
     use rand::{thread_rng, Rng};
 
-    const MIMC_ROUNDS: usize = 1000000;
+    const MIMC_ROUNDS: usize = 10;
 
     let rng = &mut thread_rng();
 

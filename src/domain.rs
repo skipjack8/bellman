@@ -190,6 +190,7 @@ impl<E: Engine, G: Group<E>> EvaluationDomain<E, G> {
 
     pub fn coset_fft(&mut self, worker: &Worker)
     {
+        //{g^i*coeff[i]}
         self.distribute_powers(worker, E::Fr::multiplicative_generator());
         self.fft(worker);
     }

@@ -219,14 +219,14 @@ impl<E:Engine> PreparedProver<E> {
 
             // here a coset is a domain where denominator (z) does not vanish
             // inverse FFT is an interpolation
-            a.ifft(&worker);
+            a.ifft(&worker); //A(X)
             // evaluate in coset
-            a.coset_fft(&worker);
+            a.coset_fft(&worker);//A(g*\omega^j)
             // same is for B and C
-            b.ifft(&worker);
-            b.coset_fft(&worker);
-            c.ifft(&worker);
-            c.coset_fft(&worker);
+            b.ifft(&worker);//B(X)
+            b.coset_fft(&worker);//B(g*\omega^j)
+            c.ifft(&worker);//C(X)
+            c.coset_fft(&worker);//C(g*\omega^j)
 
             // do A*B-C in coset
             a.mul_assign(&worker, &b);
@@ -234,9 +234,9 @@ impl<E:Engine> PreparedProver<E> {
             a.sub_assign(&worker, &c);
             drop(c);
             // z does not vanish in coset, so we divide by non-zero
-            a.divide_by_z_on_coset(&worker);
+            a.divide_by_z_on_coset(&worker);//(A(g*\omega^j)*B(g*\omega^j)-C(g*\omega^j))/(g^n-1)
             // interpolate back in coset
-            a.icoset_fft(&worker);
+            a.icoset_fft(&worker);//h[i],i=[0..m-2]
             let mut a = a.into_coeffs();
             let a_len = a.len() - 1;
             a.truncate(a_len);
@@ -244,7 +244,7 @@ impl<E:Engine> PreparedProver<E> {
             // TODO: in large settings it may worth to parallelize
             let a = Arc::new(scalars_into_representations::<E>(&worker, a)?);
             // let a = Arc::new(a.into_iter().map(|s| s.0.into_repr()).collect::<Vec<_>>());
-
+            //h[i]*[x^i * t(x)/delta]_1
             multiexp(&worker, params.get_h(a.len())?, FullDensity, a)
         };
 
