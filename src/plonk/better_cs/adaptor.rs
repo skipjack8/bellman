@@ -894,7 +894,7 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
                     lc,
                     multiplier,
                     free_constant_term,
-                    false,
+                    false,//TODO: false ?
                     &mut space
                 ).expect("must allocate LCs as gates for constraint like c0 * LC = c1");
 
@@ -908,10 +908,12 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
 
                 return;
             },
-            (false, false, true) => {// lc * lc = const
+            (false, false, true) => {// lc * lc = const，c.lc.len()=0
                 // println!("LC * LC = C");    
                 // potential quadatic gate, but ig general
                 // it's a full multiplication gate
+                // 判断左输入、右输入、输出的变量是一样的，
+                // (constant_term, linear_term, quadratic_term)
                 let (is_quadratic_gate, _coeffs) = check_for_quadratic_gate::<E>(
                     &a_lc, 
                     &b_lc, 
@@ -934,7 +936,7 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
 
                     return;
                 }
-
+                //如果lc_a, lc_b变量不一致
                 let mut space = self.transpilation_scratch_space.take().unwrap();
 
                 let (_new_a_var, _, hint_a) = enforce_lc_as_gates(
@@ -951,7 +953,7 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
                     b_lc,
                     one_fr,
                     b_constant_term,
-                    true,
+                    true,//分配新的变量，用新的变量约束当前plonk门
                     &mut space
                 ).expect("must allocate B LC as gates for constraint like LC * LC = c1");
 
@@ -971,7 +973,7 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
                 self.hints.push((current_lc_number, hint));
 
             },
-            (true, false, false) | (false, true, false) => {
+            (true, false, false) | (false, true, false) => {// const * lc = lc. lc * const = lc
                 // sometihng like LC * const = LC
                 // so we can merge them into one long linear combination
                 let multiplier = if a_is_constant {
@@ -983,9 +985,9 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
                 };
 
                 let lc_variant = if a_is_constant {
-                    MergeLcVariant::MergeBCThroughConstantA
+                    MergeLcVariant::MergeBCThroughConstantA//c * lcb = lcc,c*lcb-lcc=0
                 } else {
-                    MergeLcVariant::MergeACThroughConstantB
+                    MergeLcVariant::MergeACThroughConstantB//lca*c=lcc, c*lac-lcc=0
                 };
 
                 if multiplier == zero_fr {
@@ -1031,7 +1033,7 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
                     }
                 }
 
-                let mut free_constant_term = a_constant_term;
+                let mut free_constant_term = a_constant_term;//issue
                 free_constant_term.mul_assign(&multiplier);
                 free_constant_term.sub_assign(&c_constant_term);
 
@@ -1285,7 +1287,7 @@ fn check_for_quadratic_gate<E: Engine>(
     }
 
     if is_quadratic {
-        // something like (v - 1) * (v - 1) = (v - 1)
+        // something like (av + d) * (bv + e) = (cv + f)
         // and we can make a quadratic gate
 
         let mut quadratic_term = a_linear_var_coeff;
@@ -1509,7 +1511,7 @@ fn subtract_lcs_with_dedup_stable<E: Engine, CS: ConstraintSystem<E>>(
     }
 
     let mut deduped_vec: Vec<(crate::cs::Variable, E::Fr)> = Vec::with_capacity(lc_0.as_ref().len() + lc_1.as_ref().len());
-
+    //lc0重复变量合并
     for (var, coeff) in lc_0.0.into_iter() {
         if let Some(existing_index) = scratch.get(&var) {
             let (_, c) = &mut deduped_vec[*existing_index];
@@ -1520,7 +1522,7 @@ fn subtract_lcs_with_dedup_stable<E: Engine, CS: ConstraintSystem<E>>(
             scratch.insert(var, new_idx);
         }
     }
-
+    //lc1重复变量合并
     for (var, coeff) in lc_1.0.into_iter() {
         if let Some(existing_index) = scratch.get(&var) {
             let (_, c) = &mut deduped_vec[*existing_index];
