@@ -335,7 +335,7 @@ pub fn commit_using_monomials<E: Engine>(
 
     let scalars_repr = elements_into_representations::<E>(
         &worker,
-        &poly.as_ref()
+        &poly.as_ref()//系数
     )?;
 
     println!("Scalars conversion taken {:?}", subtime.elapsed());
