@@ -282,7 +282,7 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
                     },
                     Variable(Index::Input(index)) => {
                         let i = *index; // inputs are [1, num_inputs]
-                        partitions[i].push((var_index_in_gate, gate_idx+1));
+                        partitions[i].push((var_index_in_gate, gate_idx+1));//第几个门电路的第几个变量
                     },
                     Variable(Index::Aux(index)) => {
                         let i = index + num_inputs; // aux are [num_inputs + 1, ..]
@@ -300,7 +300,7 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
         // now we need to make root at it's cosets
         let domain_elements = materialize_domain_elements_with_natural_enumeration(
             &domain, &worker
-        );
+        );// g^i,i=0,..,n
 
         // domain_elements.pop().unwrap();
 
@@ -309,7 +309,7 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
 
         let mut non_residues = vec![];
         non_residues.push(E::Fr::one());
-        non_residues.extend(make_non_residues::<E::Fr>(3, &domain));
+        non_residues.extend(make_non_residues::<E::Fr>(3, &domain));//再寻找3个二次非剩余
 
         assert_eq!(non_residues.len(), 4);
 

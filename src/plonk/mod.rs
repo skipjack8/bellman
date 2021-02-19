@@ -94,11 +94,11 @@ pub fn setup<E: Engine, C: crate::Circuit<E>>(
     let mut assembly = self::better_cs::generator::GeneratorAssembly::<E, PlonkCsWidth4WithNextStepParams>::new();
 
     adapted_curcuit.synthesize(&mut assembly)?;
-    assembly.finalize();
+    assembly.finalize();//电路门数补到2^n
 
     let worker = Worker::new();
 
-    assembly.setup(&worker)
+    assembly.setup(&worker)//计算selector多项式和置换多项式
 }
 
 pub fn make_verification_key<E: Engine, P: PlonkConstraintSystemParams<E>>(

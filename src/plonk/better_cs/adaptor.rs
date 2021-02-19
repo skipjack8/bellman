@@ -1696,7 +1696,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
         let mut space = self.transpilation_scratch_space.take().unwrap();
 
         match hint {
-            TranspilationVariant::IntoQuadraticGate => {
+            TranspilationVariant::IntoQuadraticGate => {//lc*lc=const or lc*lc=lc, 每个lc至多只有一个变量，且是同一个变量
                 let var = if !a_lc_is_empty {
                     convert_variable(a_lc.0[0].0)
                 } else if !b_lc_is_empty {
@@ -1717,7 +1717,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
                 );
 
                 debug_assert!(is_quadratic);
-
+                // c0常数项，c1一次项系数，c2二次项系数
                 let (c0, c1, c2) = coeffs;
 
                 space.scratch_space_for_coeffs.resize(P::STATE_WIDTH, zero_fr);
@@ -1833,7 +1833,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
                     },
                 };
 
-                if c_is_just_a_constant {
+                if c_is_just_a_constant {//lc * lc = const
                     let mut constant_term = c_constant_term;
                     constant_term.negate(); // - C
 
@@ -1854,7 +1854,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
                         &*space.scratch_space_for_vars,
                         &*space.scratch_space_for_coeffs
                     ).expect("must make a multiplication gate with C being constant");
-                } else {
+                } else {//lc * lc = lc
                     // Plain multiplication gate
 
                     q_c.negate(); // - C
@@ -1866,7 +1866,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
 
                     space.scratch_space_for_coeffs[2] = q_c;
                     space.scratch_space_for_coeffs.push(q_m);
-                    space.scratch_space_for_coeffs.push(zero_fr);
+                    space.scratch_space_for_coeffs.push(zero_fr);//lc_a, lc_b, lc_c的常数项都已合并到各自的variable中
                     space.scratch_space_for_coeffs.push(zero_fr);
 
                     // ~ A*B - C == 0
@@ -1882,12 +1882,12 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
                     ).expect("must make a plain multiplication gate");
                 }
             },
-            // make an addition gate
+            // make an addition gate， const * lc = const
             TranspilationVariant::IntoAdditionGate(hint) => {
                 // these are simple enforcements that are not a part of multiplication gate
                 // or merge of LCs
 
-                if c_is_constant {
+                if c_is_constant {//c必须是常数
                     let lc = if !a_is_constant {
                         a_lc
                     } else if !b_is_constant {
@@ -1929,7 +1929,7 @@ impl<'a, E: Engine, P: PlonkConstraintSystemParams<E>, CS: PlonkConstraintSystem
                     // c is not a constant and it's handled by MergeLCs
                     unreachable!();
                 }
-            },
+            },//lc * const = lc
             TranspilationVariant::MergeLinearCombinations(merge_variant, merge_hint) => {
                 let multiplier = if a_is_constant {
                     a_constant_term
