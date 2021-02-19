@@ -1754,16 +1754,14 @@ impl<F: PrimeField> Polynomial<F, Values> {
                                     .zip(c.iter()) {
                         s[0].mul_assign(&c);
                         *g = s[0];
-                    }
-                });
+                    }// work_chunk = [a,ab,abc,d,de,def,...,xyz],
+                });// subproducts= [abc,def,...,xyz]
             }
         });
 
-        // subproducts are [abc, def, xyz]
-
         // we do not need the last one
         subproducts.pop().expect("has at least one value");
-
+        //subproducts= [abc,abcdef,..]
         let mut tmp = F::one();
         for s in subproducts.iter_mut() {
             tmp.mul_assign(&s);
@@ -1776,13 +1774,13 @@ impl<F: PrimeField> Polynomial<F, Values> {
             for (g, s) in work_chunk[chunk_len..].chunks_mut(chunk_len)
                         .zip(subproducts.chunks(1)) {
                 scope.spawn(move |_| {
-                    for g in g.iter_mut() {
-                        g.mul_assign(&s[0]);
-                    }
+                    for g in g.iter_mut() {//work_chunk = [a,ab,abc,d,de,def,...,xyz],
+                        g.mul_assign(&s[0]);//subproducts= [abc,abcdef,..]
+                    } // abc*d, abc*de, abc*def, acbdef*g,acbdef*gh,acbdef*ghi...]
                 });
             }
         });
-
+        //1,a,abc,abc,abcd,abcde,.....
         Polynomial::from_values(result)
     }
 

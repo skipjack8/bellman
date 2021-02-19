@@ -514,15 +514,15 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
     ), SynthesisError>
     {
         let FirstVerifierMessage { beta, gamma, ..} = first_verifier_message;
-
+        // a(omega^j), b(omega^j), c(omega^j), d(omega^j),j=0,..,n
         assert_eq!(first_state.witness_polys_unpadded_values.len(), 4, "first state must containt assignment poly values");
 
         let mut grand_products_protos_with_gamma = first_state.witness_polys_unpadded_values.clone();
 
         // add gamma here to save computations later
         for p in grand_products_protos_with_gamma.iter_mut() {
-            p.add_constant(&worker, &gamma);
-        }
+            p.add_constant(&worker, &gamma);//n次加法
+        }//w_j + gamma
 
         let required_domain_size = first_state.required_domain_size;
 
@@ -531,12 +531,12 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         let mut domain_elements = materialize_domain_elements_with_natural_enumeration(
             &domain, 
             &worker
-        );
+        );//omega^j
 
         domain_elements.pop().expect("must pop last element for omega^i");
 
         let mut domain_elements_poly_by_beta = Polynomial::from_values_unpadded(domain_elements)?;
-        domain_elements_poly_by_beta.scale(&worker, beta);
+        domain_elements_poly_by_beta.scale(&worker, beta);// beta*omega^j
 
         // we take A, B, C, ... values and form (A + beta * X * non_residue + gamma), etc and calculate their grand product
 
@@ -544,20 +544,21 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             let mut grand_products_proto_it = grand_products_protos_with_gamma.iter().cloned();
 
             let mut z_1 = grand_products_proto_it.next().unwrap();
-            z_1.add_assign(&worker, &domain_elements_poly_by_beta);
+            z_1.add_assign(&worker, &domain_elements_poly_by_beta);//a(omega^j) + beta*omega^j + gamma
 
             for (mut p, non_res) in grand_products_proto_it.zip(first_state.non_residues.iter()) {
                 p.add_assign_scaled(&worker, &domain_elements_poly_by_beta, non_res);
                 z_1.mul_assign(&worker, &p);
-            }
+            }//b(omega^j)+ non_res[0] * beta * omega^j + gamma, c(omega^j)+ non_res[1] * beta * omega^j + gamma, d(omega^j)+ non_res[2] * beta * omega^j + gamma,
 
             z_1
-        };
+        };//分子已经计算出来
 
         // we take A, B, C, ... values and form (A + beta * perm_a + gamma), etc and calculate their grand product
 
         let mut permutation_polynomials_values_of_size_n_minus_one = vec![];
-
+        // sigma_1(omega^j),sigma_2(omega^j),sigma_3(omega^j),sigma_4(omega^j)
+        // 可以预计算
         if let Some(prec) = setup_precomputations {
             for p in prec.permutation_polynomials_values_of_size_n_minus_one.iter() {
                 let pp = PrecomputationsForPolynomial::Borrowed(p);
@@ -593,7 +594,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             );
             let mut grand_products_proto_it = grand_products_protos_with_gamma.into_iter();
             let mut permutation_polys_it = permutation_polynomials_values_of_size_n_minus_one.iter();
-
+            // a(omega^j) + gamma + beta * sigma_1(omega^j)
             let mut z_2 = grand_products_proto_it.next().unwrap();
             z_2.add_assign_scaled(&worker, permutation_polys_it.next().unwrap().as_ref(), &beta);
 
@@ -602,16 +603,16 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 // permutation polynomials 
                 p.add_assign_scaled(&worker, perm.as_ref(), &beta);
                 z_2.mul_assign(&worker, &p);
-            }
+            }//b(omega^j) + gamma + beta * sigma_2(omega^j)， c(omega^j) + gamma + beta * sigma_3(omega^j)， d(omega^j) + gamma + beta * sigma_4(omega^j)，
 
             z_2.batch_inversion(&worker)?;
 
             z_2
         };
-
+        // {()()()()/()()()()}_j
         z_num.mul_assign(&worker, &z_den);
         drop(z_den);
-
+        //z[omega^j]
         let z = z_num.calculate_shifted_grand_product(&worker)?;
 
         assert!(z.size().is_power_of_two());
@@ -620,9 +621,9 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         // println!("Z last = {}", z.as_ref().last().unwrap());
         // assert!(z.as_ref().last().expect("must exist") == &E::Fr::one());
 
-        // interpolate on the main domain
+        // interpolate on the main domain,calculate Z(x)
         let z_in_monomial_form = z.ifft_using_bitreversed_ntt(&worker, precomputed_omegas_inv.as_ref(), &E::Fr::one())?;
-
+        //计算Z(x)承诺
         let z_commitment = commit_using_monomials(
             &z_in_monomial_form, 
             &crs_mons, 
@@ -631,10 +632,10 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
         let state = SecondPartialProverState::<E, PlonkCsWidth4WithNextStepParams> {
             required_domain_size,
-            non_residues: first_state.non_residues,
+            non_residues: first_state.non_residues, // 5,7,10
             input_values: first_state.input_values,
-            witness_polys_as_coeffs: first_state.witness_polys_as_coeffs,
-            z_in_monomial_form: z_in_monomial_form,
+            witness_polys_as_coeffs: first_state.witness_polys_as_coeffs,//a(x)..d(x)系数
+            z_in_monomial_form: z_in_monomial_form,//Z(x)系数
 
             _marker: std::marker::PhantomData
         };

@@ -105,7 +105,7 @@ impl Worker {
         let num_spawned = if elements <= self.cpus {
             elements
         } else {
-            let chunk = self.get_chunk_size(elements);
+            let chunk = self.get_chunk_size(elements);//每个cpu处理chunk个
             let mut spawned = elements / chunk;
             if spawned * chunk < elements {
                 spawned += 1;

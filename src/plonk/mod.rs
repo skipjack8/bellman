@@ -184,7 +184,7 @@ pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
     }
 
     for c in proof.wire_commitments.iter() {
-        commit_point_as_xy::<E, _>(&mut transcript, &c);
+        commit_point_as_xy::<E, _>(&mut transcript, &c);// add point
     }
 
     let beta = transcript.get_challenge();
@@ -198,7 +198,7 @@ pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
     };
 
     let subtime = Instant::now();
-
+    // phase 2 start:
     let (second_state, second_message) = self::better_cs::prover::ProverAssembly::second_step_from_first_step(
         first_state,
         first_verifier_message,
