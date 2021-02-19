@@ -380,7 +380,7 @@ pub struct Proof<E: Engine, P: PlonkConstraintSystemParams<E>> {
 impl<E: Engine, P: PlonkConstraintSystemParams<E>> Proof<E, P> {
     pub fn empty() -> Self {
         use crate::pairing::CurveAffine;
-
+        //
         Self {
             num_inputs: 0,
             n: 0,

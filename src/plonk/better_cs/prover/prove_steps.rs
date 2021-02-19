@@ -435,7 +435,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
         let domain = Domain::new_for_size(required_domain_size as u64)?;
 
-        let non_residues = make_non_residues::<E::Fr>(
+        let non_residues = make_non_residues::<E::Fr>(//5,7,10
             <PlonkCsWidth4WithNextStepParams as PlonkConstraintSystemParams<E>>::STATE_WIDTH - 1, 
             &domain
         );
@@ -443,17 +443,17 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         let full_assignments = self.make_witness_polynomials()?;
 
         // Commit wire polynomials 
-
+        // Phase 1 start:
         let mut first_message = FirstProverMessage::<E, PlonkCsWidth4WithNextStepParams> {
-            n: n,
-            num_inputs: num_inputs,
-            input_values: input_values.clone(),
-            wire_commitments: Vec::with_capacity(4),
+            n: n,//门电路个数
+            num_inputs: num_inputs,//公开输入的个数
+            input_values: input_values.clone(), //公开输入的值
+            wire_commitments: Vec::with_capacity(4),//[a(x)],[b(x)],[c(x)],[d(x)]
 
             _marker: std::marker::PhantomData
         };
 
-        let mut wire_polys_as_coefficients = Vec::with_capacity(full_assignments.len());
+        let mut wire_polys_as_coefficients = Vec::with_capacity(full_assignments.len());//4
 
         match &*precomputed_omegas_inv {
             PrecomputedOmegas::None => {
@@ -462,12 +462,12 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             _ => {}
         }
 
-        for wire_poly in full_assignments.iter() {
+        for wire_poly in full_assignments.iter() {//求 a(x),b(x),c(x),d(x)
             let as_poly = Polynomial::from_values(wire_poly.clone())?;
             let as_coeffs = as_poly
                 .ifft_using_bitreversed_ntt(&worker, precomputed_omegas_inv.as_ref(), &E::Fr::one())?;
 
-            let commitment = commit_using_monomials(
+            let commitment = commit_using_monomials(//Kate commitment，单个点
                 &as_coeffs, 
                 &crs_mons, 
                 &worker
@@ -491,7 +491,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             required_domain_size,
             non_residues,
             input_values: input_values.clone(),
-            witness_polys_as_coeffs: wire_polys_as_coefficients,
+            witness_polys_as_coeffs: wire_polys_as_coefficients,// a(x),b(x),c(x),d(x)系数
             witness_polys_unpadded_values: assignment_polynomials,
 
             _marker: std::marker::PhantomData

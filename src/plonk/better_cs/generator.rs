@@ -188,11 +188,11 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
 
         let mut q_d_next = vec![E::Fr::zero(); total_num_gates];
 
-        // expect a small number of inputs
+        // expect a small number of inputs,对公开输入的约束
         for (gate, q_a) in self.input_gates.iter()
                                             .zip(q_a.iter_mut())
         {
-            let mut tmp = gate.1[0];
+            let mut tmp = gate.1[0];//qa=-1
             tmp.negate();
             // -a + const = 0, where const will come from verifier
             assert_eq!(tmp, E::Fr::one());
@@ -224,7 +224,7 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
                     .zip(q_const_aux.chunks_mut(chunk))
                     .zip(q_d_next_aux.chunks_mut(chunk))
             {
-                scope.spawn(move |_| {
+                scope.spawn(move |_| { //遍历每个chunk里的每个门
                     for (((((((gate, q_a), q_b), q_c), q_d), q_m), q_const), q_d_next) 
                     in gate.iter()
                             .zip(q_a.iter_mut())
@@ -297,7 +297,7 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
 
         let domain = Domain::new_for_size(num_gates as u64).expect("must have enough roots of unity to fit the circuit");
 
-        // now we need to make root at it's cosets
+        // now we need to make root at it's cosets, g^i,i=0,..,n-1
         let domain_elements = materialize_domain_elements_with_natural_enumeration(
             &domain, &worker
         );// g^i,i=0,..,n
@@ -314,7 +314,7 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
         assert_eq!(non_residues.len(), 4);
 
         let mut sigma_1 = Polynomial::from_values_unpadded(domain_elements.clone()).unwrap();
-        sigma_1.scale(&worker, non_residues[0]);
+        sigma_1.scale(&worker, non_residues[0]);//{sigma*g^i}
         let mut sigma_2 = Polynomial::from_values_unpadded(domain_elements.clone()).unwrap();
         sigma_2.scale(&worker, non_residues[1]);
         let mut sigma_3 = Polynomial::from_values_unpadded(domain_elements.clone()).unwrap();
@@ -324,16 +324,16 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
 
         let mut permutations = vec![vec![]; num_partitions + 1];
 
-        fn rotate<T: Sized>(mut vec: Vec<T>) -> Vec<T> {
+        fn rotate<T: Sized>(mut vec: Vec<T>) -> Vec<T> {//左循环移1位
             if vec.len() > 1 {
-                let mut els: Vec<_> = vec.drain(0..1).collect();
+                let mut els: Vec<_> = vec.drain(0..1).collect();//取出vec[0]，赋给els
                 els.reverse();
                 vec.push(els.pop().unwrap());
             }
 
             vec
         }
-
+        //处理每一个变量
         for (i, partition) in partitions.into_iter().enumerate().skip(1) {
             // copy-permutation should have a cycle around the partition
 
@@ -348,18 +348,18 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
 
             // let permutation = partition.clone();
             // permutations[i] = permutation;
-
+            //
             for (original, new) in partition.into_iter()
                                     .zip(permutation.into_iter()) 
             {
                 // (column_idx, trace_step_idx)
-                let new_zero_enumerated = new.1 - 1;
-                let mut new_value = domain_elements[new_zero_enumerated];
+                let new_zero_enumerated = new.1 - 1;//new_gate_index: from 0
+                let mut new_value = domain_elements[new_zero_enumerated];//g^new_gate_index
 
                 // we have shuffled the values, so we need to determine FROM
                 // which of k_i * {1, omega, ...} cosets we take a value
                 // for a permutation polynomial
-                new_value.mul_assign(&non_residues[new.0]);
+                new_value.mul_assign(&non_residues[new.0]);//sigma^j * g^new_gate_index
 
                 // check to what witness polynomial the variable belongs
                 let place_into = match original.0 {
@@ -380,7 +380,7 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
                     }
                 };
 
-                let original_zero_enumerated = original.1 - 1;
+                let original_zero_enumerated = original.1 - 1;//old_gate_index
                 place_into[original_zero_enumerated] = new_value;
             }
         }

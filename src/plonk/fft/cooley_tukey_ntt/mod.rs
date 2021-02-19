@@ -110,7 +110,7 @@ impl<F: PrimeField> OmegasInvBitreversed<F> {
 
         let log_n = log2_floor(precomputation_size);
 
-        let mut omegas = vec![F::zero(); precomputation_size];
+        let mut omegas = vec![F::zero(); precomputation_size];// g^{-i}
 
         worker.scope(omegas.len(), |scope, chunk| {
             for (i, v) in omegas.chunks_mut(chunk).enumerate() {
@@ -141,7 +141,7 @@ impl<F: PrimeField> OmegasInvBitreversed<F> {
 }
 
 impl<F: PrimeField> CTPrecomputations<F> for OmegasInvBitreversed<F> {
-    fn new_for_domain_size(size: usize) -> Self {
+    fn new_for_domain_size(size: usize) -> Self {//prove phase 1
         let domain = Domain::<F>::new_for_size(size as u64).expect("domain must exist");
         let worker = Worker::new();
         Self::new_for_domain(&domain, &worker)

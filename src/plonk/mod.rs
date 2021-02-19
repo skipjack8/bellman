@@ -143,7 +143,7 @@ pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
     use std::time::Instant;
 
     let adapted_curcuit = AdaptorCircuit::<E, PlonkCsWidth4WithNextStepParams, _>::new(circuit, &hints);
-
+    // TODO: num_aux ?= setup.n
     let mut assembly = self::better_cs::prover::ProverAssembly::new_with_size_hints(setup.num_inputs, setup.n);
 
     let subtime = Instant::now();
@@ -165,22 +165,22 @@ pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
     let mut proof = Proof::<E, PlonkCsWidth4WithNextStepParams>::empty();
 
     let subtime = Instant::now();
-
+    // 第一个阶段
     let (first_state, first_message) = assembly.first_step_with_monomial_form_key(
         &worker,
         csr_mon_basis,
-        &mut precomputed_omegas_inv
+        &mut precomputed_omegas_inv//none
     )?;
 
     println!("First step (witness commitment) taken {:?}", subtime.elapsed());
 
-    proof.n = first_message.n;
-    proof.num_inputs = first_message.num_inputs;
-    proof.input_values = first_message.input_values;
-    proof.wire_commitments = first_message.wire_commitments;
+    proof.n = first_message.n;// 门电路个数
+    proof.num_inputs = first_message.num_inputs;// 公开输入个数
+    proof.input_values = first_message.input_values; // 公开输入值
+    proof.wire_commitments = first_message.wire_commitments; // [a(x)][b(x)][c(x)][d(x)]
 
     for inp in proof.input_values.iter() {
-        transcript.commit_field_element(inp);
+        transcript.commit_field_element(inp); // public inputs value
     }
 
     for c in proof.wire_commitments.iter() {
