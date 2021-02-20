@@ -665,7 +665,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
     {
         let z_in_monomial_form = second_state.z_in_monomial_form;
 
-        // those are z(x*Omega) formally
+        // those are z(x*Omega) formally, z_i*omega^i
         let mut z_shifted_in_monomial_form = z_in_monomial_form.clone();
         z_shifted_in_monomial_form.distribute_powers(&worker, z_in_monomial_form.omega);
         
@@ -702,7 +702,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
                 let lde = d_next.bitreversed_lde_using_bitreversed_ntt(
                     &worker, 
-                    LDE_FACTOR, 
+                    LDE_FACTOR, //4
                     precomputed_omegas.as_ref(), 
                     &coset_factor
                 )?;
@@ -738,10 +738,10 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
             let mut inputs_poly = inputs_poly.ifft_using_bitreversed_ntt(&worker, precomputed_omegas_inv.as_ref(), &E::Fr::one())?;
 
-            // add constants selectors vector
+            // add constants selectors vector, qconst(x)
             inputs_poly.add_assign(&worker, setup.selector_polynomials.last().unwrap());
 
-            // LDE
+            // LDE, 计算PI(sigma*omega^j)+qconst(sigma*omega^j)
             let mut t_1 = inputs_poly.bitreversed_lde_using_bitreversed_ntt(
                 &worker, 
                 LDE_FACTOR, 
@@ -760,9 +760,9 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 &setup_precomputations,
                 precomputed_omegas,
                 &worker
-            )?;
-            tmp.mul_assign(&worker, &a_selector.as_ref());
-            t_1.add_assign(&worker, &tmp);
+            )?;//Q_A(sigma*omega^j)
+            tmp.mul_assign(&worker, &a_selector.as_ref());//Q_A(sigma*omega^j) * A(sigma*omega^j)
+            t_1.add_assign(&worker, &tmp);//PI(sigma*omega^j)+qconst(sigma*omega^j) + Q_A(sigma*omega^j) * A(sigma*omega^j)
             drop(a_selector);
 
             // Q_B * B
@@ -776,7 +776,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 &worker
             )?;
             tmp.mul_assign(&worker, &b_selector.as_ref());
-            t_1.add_assign(&worker, &tmp);
+            t_1.add_assign(&worker, &tmp);// PI + qconst + Q_A*A + Q_B*B
             drop(b_selector);
 
             // Q_C * C
@@ -790,7 +790,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 &worker
             )?;
             tmp.mul_assign(&worker, c_selector.as_ref());
-            t_1.add_assign(&worker, &tmp);
+            t_1.add_assign(&worker, &tmp);//t1 = PI + qconst + Q_A*A + Q_B*B + Q_C*C
             drop(c_selector);
 
             // Q_D * D
@@ -804,7 +804,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 &worker
             )?;
             tmp.mul_assign(&worker, d_selector.as_ref());
-            t_1.add_assign(&worker, &tmp);
+            t_1.add_assign(&worker, &tmp);//t1 = PI + qconst + Q_A*A + Q_B*B + Q_C*C + Q_D*D
             drop(d_selector);
 
             // Q_M * A * B
@@ -819,7 +819,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 &worker
             )?;
             tmp.mul_assign(&worker, &m_selector.as_ref());
-            t_1.add_assign(&worker, &tmp);
+            t_1.add_assign(&worker, &tmp);//t1 =  PI + qconst + Q_A*A + Q_B*B + Q_C*C + Q_D*D + QM*A*B
             drop(m_selector);
 
             tmp.reuse_allocation(&witness_next_ldes_on_coset[0]);
@@ -834,7 +834,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             tmp.mul_assign(&worker, d_next_selector.as_ref());
             t_1.add_assign(&worker, &tmp);
             drop(d_next_selector);
-
+            // t1=  (PI + qconst + Q_A*A + Q_B*B + Q_C*C + Q_D*D + QM*A*B + QD_next * D_next) 在 (sigma*omega^j)点的值
             (t_1, tmp)
         };
 
@@ -842,7 +842,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         drop(witness_next_ldes_on_coset);
 
         // now compute the permutation argument
-
+        //Z(sigma*omega^j)
         let z_coset_lde_bitreversed = z_in_monomial_form.clone().bitreversed_lde_using_bitreversed_ntt(
             &worker, 
             LDE_FACTOR, 
@@ -851,7 +851,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         )?;
 
         assert!(z_coset_lde_bitreversed.size() == required_domain_size*LDE_FACTOR);
-
+        //Z(omega*sigma*omega^j)
         let z_shifted_coset_lde_bitreversed = z_shifted_in_monomial_form.bitreversed_lde_using_bitreversed_ntt(
             &worker, 
             LDE_FACTOR, 
@@ -863,7 +863,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
         let domain = Domain::new_for_size(required_domain_size as u64)?;
 
-        let non_residues = make_non_residues::<E::Fr>(
+        let non_residues = make_non_residues::<E::Fr>(//5,7,10
             <PlonkCsWidth4WithNextStepParams as PlonkConstraintSystemParams<E>>::STATE_WIDTH - 1, 
             &domain
         );
