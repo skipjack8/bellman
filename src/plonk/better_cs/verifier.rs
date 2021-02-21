@@ -47,7 +47,7 @@ pub fn verify<E: Engine, P: PlonkConstraintSystemParams<E>, T: Transcript<E::Fr>
 
     let selector_q_const_index = P::STATE_WIDTH + 1;
     let selector_q_m_index = P::STATE_WIDTH;
-
+    //计算二次非剩余
     let non_residues = make_non_residues::<E::Fr>(P::STATE_WIDTH - 1, &domain);
 
     // Commit public inputs
@@ -98,8 +98,8 @@ pub fn verify<E: Engine, P: PlonkConstraintSystemParams<E>, T: Transcript<E::Fr>
 
     // do the actual check for relationship at z
 
-    {
-        let mut lhs = proof.quotient_polynomial_at_z;
+    {//跟证明第4步的验证是一样的
+        let mut lhs = proof.quotient_polynomial_at_z;//t(z)
         let vanishing_at_z = evaluate_vanishing_for_size(&z, required_domain_size as u64);
         lhs.mul_assign(&vanishing_at_z);
 
@@ -163,7 +163,7 @@ pub fn verify<E: Engine, P: PlonkConstraintSystemParams<E>, T: Transcript<E::Fr>
 
     let u = transcript.get_challenge();
 
-    let z_in_domain_size = z.pow(&[required_domain_size as u64]);
+    let z_in_domain_size = z.pow(&[required_domain_size as u64]);//z^n
 
     // first let's reconstruct the linearization polynomial from
     // honomorphic commitments, and simultaneously add (through the separation scalar "u")

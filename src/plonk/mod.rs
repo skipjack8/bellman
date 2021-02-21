@@ -225,7 +225,7 @@ pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
     };
 
     let subtime = Instant::now();
-
+    // Phase 3 start
     let (third_state, third_message) = self::better_cs::prover::ProverAssembly::third_step_from_second_step(
         second_state,
         second_verifier_message,
@@ -257,7 +257,7 @@ pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
     };
 
     let subtime = Instant::now();
-
+    // Phase 4 start
     let (fourth_state, fourth_message) = self::better_cs::prover::ProverAssembly::fourth_step_from_third_step(
         third_state,
         third_verifier_message,
@@ -267,12 +267,12 @@ pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
 
     println!("Fourth step (openings at z) taken {:?}", subtime.elapsed());
 
-    proof.wire_values_at_z = fourth_message.wire_values_at_z;
-    proof.wire_values_at_z_omega = fourth_message.wire_values_at_z_omega;
-    proof.permutation_polynomials_at_z = fourth_message.permutation_polynomials_at_z;
-    proof.grand_product_at_z_omega = fourth_message.grand_product_at_z_omega;
-    proof.quotient_polynomial_at_z = fourth_message.quotient_polynomial_at_z;
-    proof.linearization_polynomial_at_z = fourth_message.linearization_polynomial_at_z;
+    proof.wire_values_at_z = fourth_message.wire_values_at_z;//a(z),b(z),z(z),d(z)
+    proof.wire_values_at_z_omega = fourth_message.wire_values_at_z_omega;//d(z*omega)
+    proof.permutation_polynomials_at_z = fourth_message.permutation_polynomials_at_z;//perm_a(z),perm_b(z),perm_c(z)
+    proof.grand_product_at_z_omega = fourth_message.grand_product_at_z_omega;//Z(z*omega)
+    proof.quotient_polynomial_at_z = fourth_message.quotient_polynomial_at_z;//t(z)
+    proof.linearization_polynomial_at_z = fourth_message.linearization_polynomial_at_z;//r(z)
 
     for el in proof.wire_values_at_z.iter() {
         transcript.commit_field_element(el);
@@ -289,7 +289,7 @@ pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
     transcript.commit_field_element(&proof.quotient_polynomial_at_z);
     transcript.commit_field_element(&proof.linearization_polynomial_at_z);
 
-    let v = transcript.get_challenge();
+    let v = transcript.get_challenge();//没有Z(z*omega)
 
     let fourth_verifier_message = FourthVerifierMessage::<E, PlonkCsWidth4WithNextStepParams> {
         alpha,
@@ -302,7 +302,7 @@ pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
     };
 
     let subtime = Instant::now();
-
+    /// phase 5 start
     let fifth_message = self::better_cs::prover::ProverAssembly::fifth_step_from_fourth_step(
         fourth_state,
         fourth_verifier_message,
@@ -317,7 +317,7 @@ pub fn prove_by_steps<E: Engine, C: crate::Circuit<E>, T: Transcript<E::Fr>>(
     proof.opening_at_z_omega_proof = fifth_message.opening_proof_at_z_omega;
 
     println!("Proving taken {:?}", now.elapsed());
-
+    // 11 G1, 11 Fr
     Ok(proof)
 }
 
@@ -413,7 +413,7 @@ pub fn prove_from_recomputations<
 
     Ok(proof)
 }
-
+// 验证
 pub fn verify<E: Engine, T: Transcript<E::Fr>>(
     proof: &Proof<E, PlonkCsWidth4WithNextStepParams>,
     verification_key: &VerificationKey<E, PlonkCsWidth4WithNextStepParams>

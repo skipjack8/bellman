@@ -691,8 +691,8 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             _ => {}
         }
 
-        let mut witness_ldes_on_coset = vec![];
-        let mut witness_next_ldes_on_coset = vec![];
+        let mut witness_ldes_on_coset = vec![];//a(sigma*omega^j),b,c,d
+        let mut witness_next_ldes_on_coset = vec![];//
  
         for (idx, monomial) in witness_polys_in_monomial_form.iter().enumerate() {
             // this is D polynomial and we need to make next
@@ -889,7 +889,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 &worker
             )?;
             tmp.add_assign_scaled(&worker, x_precomp.as_ref(), &beta);
-            contrib_z.mul_assign(&worker, &tmp);
+            contrib_z.mul_assign(&worker, &tmp);//z(A+beta*X+gamma),X=sigma*omega^j
 
             assert_eq!(non_residues.len() + 1, witness_ldes_on_coset.len());
 
@@ -897,19 +897,20 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 let mut factor = beta;
                 factor.mul_assign(&non_res);
 
-                tmp.reuse_allocation(&w);
-                tmp.add_constant(&worker, &gamma);
-                tmp.add_assign_scaled(&worker, x_precomp.as_ref(), &factor);
+                tmp.reuse_allocation(&w);//b(x),x=sigma*omega^j
+                tmp.add_constant(&worker, &gamma);//b(x)+gamma
+                tmp.add_assign_scaled(&worker, x_precomp.as_ref(), &factor);//b(x)+gamma+beta*k*x
                 contrib_z.mul_assign(&worker, &tmp);
             }
-
+            //t1= (PI + qconst + Q_A*A + Q_B*B + Q_C*C + Q_D*D + QM*A*B + QD_next * D_next)
+            // + alpha*(A + beta*X + gamma)(B+beta*k1*X)(C+beta*k2*X)(D+beta*k3*X)Z(X), X=sigma*omega^j
             t_1.add_assign_scaled(&worker, &contrib_z, &quotient_linearization_challenge);
 
             drop(contrib_z);
 
             let mut contrib_z = z_shifted_coset_lde_bitreversed;
 
-            // A + beta*perm_a + gamma
+            // (A + beta*perm_a + gamma)...(D + beta*perm_d + gamma)
 
             for (idx, w) in witness_ldes_on_coset.iter().enumerate() {
                     let perm = get_precomputed_permutation_poly_lde_for_index(
@@ -927,17 +928,19 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 }
 
             t_1.sub_assign_scaled(&worker, &contrib_z, &quotient_linearization_challenge);
-
+            // t1= (PI + qconst + Q_A*A + Q_B*B + Q_C*C + Q_D*D + QM*A*B + QD_next * D_next)
+            //      + alpha*(A + beta*X + gamma)(B+beta*k1*X)(C+beta*k2*X)(D+beta*k3*X)Z(X)
+            //      - alpha*(A + beta*perm_a + gamma)...(D + beta*perm_d + gamma)Z(sigma*X), X=sigma*omega^j
             drop(contrib_z);
         }
 
-        quotient_linearization_challenge.mul_assign(&alpha);
+        quotient_linearization_challenge.mul_assign(&alpha);//alpha^2
 
         // z(omega^0) - 1 == 0
 
         let l_0 = calculate_lagrange_poly::<E::Fr>(&worker, required_domain_size.next_power_of_two(), 0)?;
 
-        {
+        {   //alpha^2*(Z(X)-1)(L1(X)),X=sigma*omega^j
             let mut z_minus_one_by_l_0 = z_coset_lde_bitreversed;
             z_minus_one_by_l_0.sub_constant(&worker, &E::Fr::one());
 
@@ -956,18 +959,21 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         }
 
         drop(tmp);
-
+        // t1= (PI + qconst + Q_A*A + Q_B*B + Q_C*C + Q_D*D + QM*A*B + QD_next * D_next)
+        //      + alpha*(A + beta*X + gamma)(B+beta*k1*X)(C+beta*k2*X)(D+beta*k3*X)Z(X)
+        //      - alpha*(A + beta*perm_a + gamma)...(D + beta*perm_d + gamma)Z(sigma*X)
+        //      + alpha^2*(Z(X)-1)L1(X), X=sigma*omega^j
         let divisor_inversed = get_precomputed_inverse_divisor(
             required_domain_size, 
             setup_precomputations,
             &worker
         )?;
-        t_1.mul_assign(&worker, divisor_inversed.as_ref());
+        t_1.mul_assign(&worker, divisor_inversed.as_ref());// t1(X)/ZH(X),X=sigma*omega^j
 
         t_1.bitreverse_enumeration(&worker);
-
+        // t1(X)系数
         let t_poly_in_monomial_form = t_1.icoset_fft_for_generator(&worker, &E::Fr::multiplicative_generator());
-
+        //t_poly_parts = t_1, t_2, t_3，t_4
         let t_poly_parts = t_poly_in_monomial_form.break_into_multiples(required_domain_size)?;
 
         let state = ThirdPartialProverState::<E, PlonkCsWidth4WithNextStepParams> {
@@ -1017,15 +1023,15 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
         let mut state = FourthPartialProverState::<E, PlonkCsWidth4WithNextStepParams> {
             required_domain_size,
-            non_residues: third_state.non_residues,
-            input_values: third_state.input_values,
-            witness_polys_as_coeffs: third_state.witness_polys_as_coeffs,
-            z_in_monomial_form: third_state.z_in_monomial_form,
-            t_poly_parts : third_state.t_poly_parts,
+            non_residues: third_state.non_residues,// coset 二次非剩余
+            input_values: third_state.input_values,// 公开输入
+            witness_polys_as_coeffs: third_state.witness_polys_as_coeffs,// A_i,B_i,C_i,D_i
+            z_in_monomial_form: third_state.z_in_monomial_form,//Z_i
+            t_poly_parts : third_state.t_poly_parts,//t1_i,t2_i,t3_i,t4_i
             linearization_polynomial: Polynomial::<E::Fr, Coefficients>::new_for_size(0)?,
-            wire_values_at_z: vec![],
-            wire_values_at_z_omega: vec![],
-            permutation_polynomials_at_z: vec![],
+            wire_values_at_z: vec![],//a(z),..,d(z)
+            wire_values_at_z_omega: vec![],// Z(z*omega)
+            permutation_polynomials_at_z: vec![],//perm_a(z),perm_d(z),perm_c(z)
             grand_product_at_z_omega: E::Fr::zero(),
             quotient_polynomial_at_z: E::Fr::zero(),
             linearization_polynomial_at_z: E::Fr::zero(),
@@ -1034,25 +1040,25 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         };
 
         let mut z_by_omega = z;
-        z_by_omega.mul_assign(&domain.generator);
+        z_by_omega.mul_assign(&domain.generator);//z*omega
 
         for (idx, p) in state.witness_polys_as_coeffs.iter().enumerate() {
             let value_at_z = p.evaluate_at(&worker, z);
             state.wire_values_at_z.push(value_at_z);
             if idx == 3 {
                 let value_at_z_omega = p.evaluate_at(&worker, z_by_omega);
-                state.wire_values_at_z_omega.push(value_at_z_omega);
+                state.wire_values_at_z_omega.push(value_at_z_omega);//d(z*omega)
             }
         }
-
+        //perm_a(z),perm_b(z),perm_c(z)
         for p in setup.permutation_polynomials[..(setup.permutation_polynomials.len() - 1)].iter() {
             let value_at_z = p.evaluate_at(&worker, z);
             state.permutation_polynomials_at_z.push(value_at_z);
         }
-
+        // Z(z*omega)
         let z_at_z_omega = state.z_in_monomial_form.evaluate_at(&worker, z_by_omega);
         state.grand_product_at_z_omega = z_at_z_omega;
-
+        //t(z)
         let t_at_z = {
             let mut result = E::Fr::zero();
             let mut current = E::Fr::one();
@@ -1071,34 +1077,34 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
         let mut quotient_linearization_challenge = E::Fr::one();
 
-        let r = {
+        let r = {//计算多项式r
             // Q_const
             let mut r = setup.selector_polynomials[5].clone();
 
-            // Q_A * A(z)
+            // + Q_A * A(z)
             r.add_assign_scaled(&worker, &setup.selector_polynomials[0], &state.wire_values_at_z[0]);
 
-            // Q_B * B(z)
+            // + Q_B * B(z)
             r.add_assign_scaled(&worker, &setup.selector_polynomials[1], &state.wire_values_at_z[1]);
 
-            // Q_C * C(z)
+            // + Q_C * C(z)
             r.add_assign_scaled(&worker, &setup.selector_polynomials[2], &state.wire_values_at_z[2]);
 
-            // Q_D * D(z)
+            // + Q_D * D(z)
             r.add_assign_scaled(&worker, &setup.selector_polynomials[3], &state.wire_values_at_z[3]);
 
-            // Q_M * A(z) * B(z)
+            //  Q_M * A(z) * B(z)
             let mut scaling_factor = state.wire_values_at_z[0];
             scaling_factor.mul_assign(&state.wire_values_at_z[1]);
             r.add_assign_scaled(&worker, &setup.selector_polynomials[4], &scaling_factor);
 
-            // Q_D_Next * D(z*omega)
+            // + Q_D_Next * D(z*omega)
 
             r.add_assign_scaled(&worker, &setup.next_step_selector_polynomials[0], &state.wire_values_at_z_omega[0]);
 
-            quotient_linearization_challenge.mul_assign(&alpha);
+            quotient_linearization_challenge.mul_assign(&alpha);//alpha
 
-            // + (a(z) + beta*z + gamma)*()*()*()*Z(x)
+            // + (a(z) + beta*z + gamma)*()*()*()*Z(X)*alpha
 
             let mut factor = quotient_linearization_challenge;
             for (wire_at_z, non_residue) in state.wire_values_at_z.iter()
@@ -1115,11 +1121,11 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
             r.add_assign_scaled(&worker, &state.z_in_monomial_form, &factor);
 
-            // - (a(z) + beta*perm_a + gamma)*()*()*z(z*omega) * beta * perm_d(X)
+            // - (a(z) + beta*perm_a + gamma)*()*() * beta * Z(z*omega)  * perm_d(X) * alpha
 
-            let mut factor = quotient_linearization_challenge;
-            factor.mul_assign(&beta);
-            factor.mul_assign(&z_at_z_omega);
+            let mut factor = quotient_linearization_challenge;//alpha
+            factor.mul_assign(&beta);// alpha * beta
+            factor.mul_assign(&z_at_z_omega);//  alpha * beta * Z(z*omega)
 
             for (wire_at_z, perm_at_z) in state.wire_values_at_z.iter()
                             .zip(state.permutation_polynomials_at_z.iter())
@@ -1134,9 +1140,9 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
             r.sub_assign_scaled(&worker, &setup.permutation_polynomials.last().expect("last permutation poly"), &factor);
 
-            // + L_0(z) * Z(x)
+            // + L_0(z) * Z(x) * alpha^2
 
-            quotient_linearization_challenge.mul_assign(&alpha);
+            quotient_linearization_challenge.mul_assign(&alpha);//alpha ^ 2
 
             let mut factor = evaluate_l0_at_point(required_domain_size as u64, z)?;
             factor.mul_assign(&quotient_linearization_challenge);
@@ -1144,10 +1150,10 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             r.add_assign_scaled(&worker, &state.z_in_monomial_form, &factor);
 
             r
-        };
+        };//多项式r计算结束
 
         // commit the linearization polynomial
-
+        //计算r(z)
         let r_at_z = r.evaluate_at(&worker, z);
         state.linearization_polynomial_at_z = r_at_z;
 
@@ -1157,14 +1163,14 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         {
             let mut lhs = t_at_z;
             let vanishing_at_z = evaluate_vanishing_for_size(&z ,required_domain_size as u64);
-            lhs.mul_assign(&vanishing_at_z);
+            lhs.mul_assign(&vanishing_at_z);// t(z)*Z_H(z)
 
             let mut quotient_linearization_challenge = E::Fr::one();
 
             let mut rhs = r_at_z;
 
             // add public inputs
-            {
+            {// r(z)+ PI(z)
                 for (idx, input) in state.input_values.iter().enumerate() {
                     let mut tmp = evaluate_lagrange_poly_at_point(idx, &domain, z)?;
                     tmp.mul_assign(&input);
@@ -1173,9 +1179,9 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 }
             }
 
-            quotient_linearization_challenge.mul_assign(&alpha);
+            quotient_linearization_challenge.mul_assign(&alpha);//alpha
 
-            // - \alpha (a + perm(z) * beta + gamma)*()*(d + gamma) & z(z*omega)
+            // - alpha (a + perm(z) * beta + gamma)*()*(d + gamma) & z(z*omega)
 
             let mut z_part = z_at_z_omega;
 
@@ -1186,17 +1192,17 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 tmp.mul_assign(&beta);
                 tmp.add_assign(&gamma);
                 tmp.add_assign(&w);
-                
+                // (beta*perm_a(z)+gamma+a(z))*()*()
                 z_part.mul_assign(&tmp);
-            }   
+            } //  z_part = Z(z*omega)* (beta*perm_a(z)+gamma+a(z))*()*()
 
             // last poly value and gamma
-            let mut tmp = gamma;
+            let mut tmp = gamma;//gamma+d(z)
             tmp.add_assign(&state.wire_values_at_z.iter().rev().next().unwrap());
 
             z_part.mul_assign(&tmp);
             z_part.mul_assign(&quotient_linearization_challenge);
-
+            // zpart =  Z(z*omega)* (beta*perm_a(z)+gamma+a(z))*()*()*(gamma+d(z))*alpha
             rhs.sub_assign(&z_part);
 
             quotient_linearization_challenge.mul_assign(&alpha);
@@ -1255,26 +1261,26 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         // next step witnesses (if any)
 
         let mut multiopening_challenge = E::Fr::one();
-
+        //t0(x)的系数
         let mut poly_to_divide_at_z = fourth_state.t_poly_parts.drain(0..1).collect::<Vec<_>>().pop().unwrap();
-        let z_in_domain_size = z.pow(&[required_domain_size as u64]);
+        let z_in_domain_size = z.pow(&[required_domain_size as u64]);//z^n
         let mut power_of_z = z_in_domain_size;
         for t_part in fourth_state.t_poly_parts.into_iter() {
             poly_to_divide_at_z.add_assign_scaled(&worker, &t_part, &power_of_z);
             power_of_z.mul_assign(&z_in_domain_size);
-        }
+        }//poly_to_divide_at_z = t0(x) + z^n*t1(x) + z^{2n} * t2(x) + z^{3n} * t3(x)
 
         // linearization polynomial
-        multiopening_challenge.mul_assign(&v);
+        multiopening_challenge.mul_assign(&v);//v
         poly_to_divide_at_z.add_assign_scaled(&worker, &fourth_state.linearization_polynomial, &multiopening_challenge);
-
+        // + v*r(x)
         debug_assert_eq!(multiopening_challenge, v.pow(&[1 as u64]));
 
         // all witness polys
         for w in fourth_state.witness_polys_as_coeffs.iter() {
             multiopening_challenge.mul_assign(&v);
             poly_to_divide_at_z.add_assign_scaled(&worker, &w, &multiopening_challenge);
-        }
+        }// + v^2 * a(x) +  v^3 * a(x) +  v^4 * a(x) +  v^5 * d(x)
 
         debug_assert_eq!(multiopening_challenge, v.pow(&[(1 + 4) as u64]));
 
@@ -1282,27 +1288,27 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         for p in setup.permutation_polynomials[..(setup.permutation_polynomials.len() - 1)].iter() {
             multiopening_challenge.mul_assign(&v);
             poly_to_divide_at_z.add_assign_scaled(&worker, &p, &multiopening_challenge);
-        }
+        }// + v^6 * perm_a(x) + v^7 * perm_b(x) + v^8 * perm_c(x)
 
         debug_assert_eq!(multiopening_challenge, v.pow(&[(1 + 4 + 3) as u64]));
 
-        multiopening_challenge.mul_assign(&v);
-
+        multiopening_challenge.mul_assign(&v);//v^9
+        // v^9 * z(x)
         let mut poly_to_divide_at_z_omega = fourth_state.z_in_monomial_form;
         poly_to_divide_at_z_omega.scale(&worker, multiopening_challenge);
 
-        multiopening_challenge.mul_assign(&v);
+        multiopening_challenge.mul_assign(&v);//v^10
 
         // d should be opened at z*omega due to d_next
         poly_to_divide_at_z_omega.add_assign_scaled(&worker, &fourth_state.witness_polys_as_coeffs[3], &multiopening_challenge);
         fourth_state.witness_polys_as_coeffs.truncate(0); // drop
-
+        // v^9 * z(x) + v^10 * d(x)
         debug_assert_eq!(multiopening_challenge, v.pow(&[(1 + 4 + 3 + 1 + 1) as u64]));
 
         // division in monomial form is sequential, so we parallelize the divisions
 
         let mut polys = vec![(poly_to_divide_at_z, z), (poly_to_divide_at_z_omega, z_by_omega)];
-
+        // 计算两个多项式poly_to_divide_at_z / (x-z), poly_to_divide_at_z_omega / (x-z*omega)
         worker.scope(polys.len(), |scope, chunk| {
             for p in polys.chunks_mut(chunk) {
                 scope.spawn(move |_| {
@@ -1316,13 +1322,13 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
         let open_at_z_omega = polys.pop().unwrap().0;
         let open_at_z = polys.pop().unwrap().0;
-
+        //[W_z(x)]
         let opening_at_z = commit_using_monomials(
             &open_at_z, 
             &crs_mons,
             &worker
         )?;
-
+        //[W_{z*omega}(z*omega)]
         let opening_at_z_omega = commit_using_monomials(
             &open_at_z_omega, 
             &crs_mons,
