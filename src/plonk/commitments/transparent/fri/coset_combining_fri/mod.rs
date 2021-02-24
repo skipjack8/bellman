@@ -4,7 +4,7 @@ pub mod fri;
 pub mod precomputation;
 
 use crate::SynthesisError;
-use crate::multicore::Worker;
+use crate::worker::Worker;
 use crate::ff::PrimeField;
 use crate::plonk::commitments::transparent::iop_compiler::*;
 

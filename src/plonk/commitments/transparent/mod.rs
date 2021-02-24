@@ -1,7 +1,7 @@
 use crate::pairing::ff::PrimeField;
 
 use crate::plonk::polynomials::*;
-use crate::multicore::Worker;
+use crate::worker::Worker;
 use super::CommitmentScheme;
 
 pub mod precomputations;

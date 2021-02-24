@@ -68,6 +68,29 @@ impl Worker {
 
         f(&scope, chunk_size)
     }
+
+    pub fn get_chunk_size(
+        &self,
+        elements: usize
+    ) -> usize {
+        elements
+    }
+
+    pub fn get_num_spawned_threads(
+        &self,
+        elements: usize
+    ) -> usize {
+        1
+    }
+
+    pub fn chunk_size_for_num_spawned_threads(elements: usize, num_threads: usize) -> usize {
+        assert!(elements >= num_threads, "received {} elements to spawn {} threads", elements, num_threads);
+        if elements % num_threads == 0 {
+            elements / num_threads
+        } else {
+            elements / num_threads + 1
+        }
+    }
 }
 #[derive(Clone)]
 pub struct Scope<'a> {
@@ -119,7 +142,7 @@ impl<T: Send + 'static, E: Send + 'static> WorkerFuture<T, E> {
 
 #[test]
 fn test_trivial_singlecore_spawning() {
-    use self::futures_new::executor::block_on;
+    use self::futures::executor::block_on;
 
     fn long_fn() -> Result<usize, ()> {
         let mut i: usize = 1;

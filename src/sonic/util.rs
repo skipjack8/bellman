@@ -154,7 +154,7 @@ pub fn evaluate_at_consequitive_powers<'a, F: Field> (
     base: F
 ) -> F
     {
-    use crate::multicore::Worker;
+    use crate::worker::Worker;
 
     let (s, r) = unbounded();
 
@@ -205,7 +205,7 @@ pub fn mut_evaluate_at_consequitive_powers<'a, F: Field> (
     base: F
 ) -> F
     {
-    use crate::multicore::Worker;
+    use crate::worker::Worker;
 
     let (s, r) = unbounded();
 
@@ -257,7 +257,7 @@ pub fn mut_distribute_consequitive_powers<'a, F: Field> (
     base: F
 )
     {
-    use crate::multicore::Worker;
+    use crate::worker::Worker;
 
     let worker = Worker::new();
 
@@ -291,7 +291,7 @@ pub fn mut_distribute_consequitive_powers<'a, F: Field> (
 //     IB::IntoIter: ExactSizeIterator + Clone,
 //     IS::IntoIter: ExactSizeIterator,
 // {
-//     use crate::multicore::Worker;
+//     use crate::worker::Worker;
 //     use crate::multiexp::dense_multiexp;
 
 //     use std::time::Instant;
@@ -334,7 +334,7 @@ where
     IB::IntoIter: ExactSizeIterator + Clone,
     IS::IntoIter: ExactSizeIterator,
 {
-    use crate::multicore::Worker;
+    use crate::worker::Worker;
     use crate::multiexp::multiexp;
     use crate::source::FullDensity;
     use futures::Future;
@@ -630,7 +630,7 @@ fn laurent_division() {
 pub fn multiply_polynomials<E: Engine>(a: Vec<E::Fr>, b: Vec<E::Fr>) -> Vec<E::Fr> {
     let result_len = a.len() + b.len() - 1;
 
-    use crate::multicore::Worker;
+    use crate::worker::Worker;
     use crate::domain::{EvaluationDomain, Scalar};
 
     let worker = Worker::new();
@@ -658,7 +658,7 @@ pub fn multiply_polynomials<E: Engine>(a: Vec<E::Fr>, b: Vec<E::Fr>) -> Vec<E::F
 
 // alternative implementation that does not require an `Evaluation domain` struct
 pub fn multiply_polynomials_fft<E: Engine>(a: Vec<E::Fr>, b: Vec<E::Fr>) -> Vec<E::Fr> {
-    use crate::multicore::Worker;
+    use crate::worker::Worker;
     use crate::domain::{best_fft, Scalar};
     use crate::group::Group;
 
@@ -791,7 +791,7 @@ pub fn multiply_polynomials_serial<E: Engine>(mut a: Vec<E::Fr>, mut b: Vec<E::F
 
 // add polynomails in coefficient form
 pub fn add_polynomials<F: Field>(a: &mut [F], b: &[F]) {
-        use crate::multicore::Worker;
+        use crate::worker::Worker;
         use crate::domain::{EvaluationDomain, Scalar};
 
         let worker = Worker::new();
@@ -812,7 +812,7 @@ pub fn add_polynomials<F: Field>(a: &mut [F], b: &[F]) {
 
 // subtract polynomails in coefficient form
 pub fn sub_polynomials<F: Field>(a: &mut [F], b: &[F]) {
-    use crate::multicore::Worker;
+    use crate::worker::Worker;
     use crate::domain::{EvaluationDomain, Scalar};
 
     let worker = Worker::new();
@@ -833,7 +833,7 @@ pub fn sub_polynomials<F: Field>(a: &mut [F], b: &[F]) {
 
 // multiply coefficients of the polynomial by the scalar
 pub fn mul_polynomial_by_scalar<F: Field>(a: &mut [F], b: F) {
-        use crate::multicore::Worker;
+        use crate::worker::Worker;
         use crate::domain::{EvaluationDomain, Scalar};
 
         let worker = Worker::new();
@@ -853,7 +853,7 @@ pub fn mul_polynomial_by_scalar<F: Field>(a: &mut [F], b: F) {
 // elementwise add coeffs of one polynomial with coeffs of other, that are 
 // first multiplied by a scalar 
 pub fn mul_add_polynomials<F: Field>(a: &mut [F], b: &[F], c: F) {
-        use crate::multicore::Worker;
+        use crate::worker::Worker;
         use crate::domain::{EvaluationDomain, Scalar};
 
         let worker = Worker::new();

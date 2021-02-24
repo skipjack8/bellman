@@ -1,5 +1,5 @@
 use crate::pairing::ff::PrimeField;
-use crate::multicore::*;
+use crate::worker::*;
 use crate::plonk::domains::*;
 use crate::plonk::transparent_engine::PartialTwoBitReductionField;
 
@@ -491,7 +491,7 @@ mod test {
         use crate::plonk::polynomials::*;
         use std::time::Instant;
         use super::*;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::fft::serial_fft;
         use super::CTPrecomputations;
@@ -633,7 +633,7 @@ mod test {
         use crate::plonk::polynomials::*;
         use std::time::Instant;
         use super::*;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::fft::parallel_fft;
         use super::CTPrecomputations;

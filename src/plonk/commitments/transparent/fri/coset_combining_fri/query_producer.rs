@@ -2,7 +2,7 @@ use crate::pairing::ff::PrimeField;
 use crate::plonk::commitments::transparent::iop::*;
 use crate::plonk::polynomials::*;
 use crate::plonk::domains::*;
-use crate::multicore::*;
+use crate::worker::*;
 use crate::SynthesisError;
 use crate::plonk::commitments::transparent::iop::*;
 use crate::plonk::commitments::transparent::utils::log2_floor;

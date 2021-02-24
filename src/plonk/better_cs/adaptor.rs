@@ -1027,7 +1027,13 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> crate::ConstraintSystem<E> fo
                     }
                 }
 
-                let mut free_constant_term = a_constant_term;
+                let mut free_constant_term = if a_is_constant {
+                    a_constant_term
+                } else if b_is_constant {
+                    b_constant_term
+                } else {
+                    unreachable!()
+                };
                 free_constant_term.mul_assign(&multiplier);
                 free_constant_term.sub_assign(&c_constant_term);
 
@@ -2101,7 +2107,7 @@ fn transpile_xor_using_new_adaptor() {
     use super::cs::PlonkCsWidth4WithNextStepParams;
     use super::generator::*;
     use super::prover::*;
-    use crate::multicore::Worker;
+    use crate::worker::Worker;
     use super::verifier::*;
     use crate::kate_commitment::*;
     use crate::plonk::commitments::transcript::*;
@@ -2180,7 +2186,7 @@ fn transpile_xor_using_new_adaptor() {
     let size = setup.permutation_polynomials[0].size();
 
     let domain = Domain::<Fr>::new_for_size(size as u64).unwrap();
-    let non_residues = make_non_residues::<Fr>(3, &domain);
+    let non_residues = make_non_residues::<Fr>(3);
     println!("Non residues = {:?}", non_residues);
 
     type Transcr = RollingKeccakTranscript<Fr>;
@@ -2196,9 +2202,10 @@ fn transpile_xor_using_new_adaptor() {
         &crs_mons,
         &omegas_bitreversed,
         &omegas_inv_bitreversed,
+        None
     ).unwrap();
 
-    let is_valid = verify::<Bn256, PlonkCsWidth4WithNextStepParams, Transcr>(&proof, &verification_key).unwrap();
+    let is_valid = verify::<Bn256, PlonkCsWidth4WithNextStepParams, Transcr>(&proof, &verification_key, None).unwrap();
 
     assert!(is_valid);
 
@@ -2227,7 +2234,7 @@ fn transpile_xor_and_prove_with_no_precomputations() {
     use super::cs::PlonkCsWidth4WithNextStepParams;
     use super::generator::*;
     use super::prover::*;
-    use crate::multicore::Worker;
+    use crate::worker::Worker;
     use super::verifier::*;
     use crate::kate_commitment::*;
     use crate::plonk::commitments::transcript::*;
@@ -2292,7 +2299,7 @@ fn transpile_xor_and_prove_with_no_precomputations() {
     let size = setup.permutation_polynomials[0].size();
 
     let domain = Domain::<Fr>::new_for_size(size as u64).unwrap();
-    let non_residues = make_non_residues::<Fr>(3, &domain);
+    let non_residues = make_non_residues::<Fr>(3);
     println!("Non residues = {:?}", non_residues);
 
     type Transcr = RollingKeccakTranscript<Fr>;
@@ -2302,10 +2309,11 @@ fn transpile_xor_and_prove_with_no_precomputations() {
         &hints,
         &setup,
         None,
-        &crs_mons
+        &crs_mons,
+        None
     ).unwrap();
 
-    let is_valid = verify::<Bn256, PlonkCsWidth4WithNextStepParams, Transcr>(&proof, &verification_key).unwrap();
+    let is_valid = verify::<Bn256, PlonkCsWidth4WithNextStepParams, Transcr>(&proof, &verification_key, None).unwrap();
 
     assert!(is_valid);
 

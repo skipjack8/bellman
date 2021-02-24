@@ -14,7 +14,7 @@ mod prefetch_fft;
 mod prefetch;
 
 use crate::pairing::ff::PrimeField;
-use crate::multicore::Worker;
+use crate::worker::Worker;
 
 cfg_if! {
     if #[cfg(feature = "nightly")] {

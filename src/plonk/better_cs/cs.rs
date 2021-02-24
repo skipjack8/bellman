@@ -47,7 +47,7 @@ pub trait StateVariablesSet: Sized + AsRef<[Variable]> + Copy + Clone + PartialE
     fn from_variables(variables: &[Variable]) -> Self;
 }
 
-pub trait PlonkConstraintSystemParams<E: Engine> {
+pub trait PlonkConstraintSystemParams<E: Engine>: Clone {
     const STATE_WIDTH: usize;
     const HAS_CUSTOM_GATES: bool;
     const CAN_ACCESS_NEXT_TRACE_STEP: bool;

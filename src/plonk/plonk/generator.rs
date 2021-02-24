@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::plonk::cs::gates::*;
 use crate::plonk::cs::*;
 
-use crate::multicore::*;
+use crate::worker::*;
 use crate::plonk::polynomials::*;
 use crate::plonk::domains::*;
 use crate::plonk::commitments::*;

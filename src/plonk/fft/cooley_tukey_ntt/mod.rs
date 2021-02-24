@@ -1,5 +1,5 @@
 use crate::pairing::ff::PrimeField;
-use crate::multicore::*;
+use crate::worker::*;
 use crate::plonk::domains::*;
 
 pub(crate) mod partial_reduction;
@@ -11,7 +11,7 @@ pub trait CTPrecomputations<F: PrimeField>: Send + Sync {
 }
 
 #[inline(always)]
-pub(crate) fn bitreverse(n: usize, l: usize) -> usize {
+pub fn bitreverse(n: usize, l: usize) -> usize {
     let mut r = n.reverse_bits();
     // now we need to only use the bits that originally were "last" l, so shift
 
@@ -520,7 +520,7 @@ mod test {
         use crate::plonk::transparent_engine::proth::Fr;
         use crate::plonk::polynomials::*;
         use std::time::Instant;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use super::CTPrecomputations;
         use super::BitReversedOmegas;
@@ -544,7 +544,7 @@ mod test {
         use crate::plonk::polynomials::*;
         use std::time::Instant;
         use super::*;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::fft::serial_fft;
         use super::CTPrecomputations;
@@ -640,7 +640,7 @@ mod test {
         use crate::plonk::polynomials::*;
         use std::time::Instant;
         use super::*;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::fft::parallel_fft;
         use super::CTPrecomputations;

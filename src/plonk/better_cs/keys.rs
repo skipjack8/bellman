@@ -1,7 +1,7 @@
 use super::cs::*;
 
 use crate::pairing::ff::{Field, PrimeField};
-use crate::pairing::Engine;
+use crate::pairing::{Engine, CurveAffine, EncodedPoint};
 
 use crate::plonk::domains::*;
 use crate::plonk::polynomials::*;
@@ -30,12 +30,131 @@ use crate::byteorder::ReadBytesExt;
 use crate::byteorder::WriteBytesExt;
 use std::io::{Read, Write};
 
+
+// pub trait EngineDataSerializationRead: Sized {
+//     fn read<R: Read>(reader: R) -> std::io::Result<Self>; 
+// }
+
+// pub trait EngineDataSerializationWrite<E: Engine>: Sized {
+//     fn write<W: Write>(&self, writer: W) -> std::io::Result<()>;
+// }
+
+// pub trait EngineDataSerialization<E: Engine>: EngineDataSerializationRead + EngineDataSerializationWrite<E> {}
+
+// impl<E: Engine> EngineDataSerializationRead for E::Fr {
+//     fn read<R: Read>(reader: R) -> std::io::Result<Self> {
+//         read_fr(reader)
+//     }
+// }
+
+// impl<E: Engine> EngineDataSerializationWrite<E> for E::Fr {
+//     fn write<W: Write>(&self, writer: W) -> std::io::Result<()> {
+//         write_fr(self, writer)
+//     }
+// }
+
+// impl<E: Engine, T> EngineDataSerializationRead for T where E::G1Affine = T {
+//     fn read<R: Read>(reader: R) -> std::io::Result<Self> {
+//         let mut repr = <Self as CurveAffine>::Uncompressed::empty();
+//         reader.read_exact(repr.as_mut())?;
+
+//         let e = repr
+//             .into_affine()
+//             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+//         Ok(e)
+//     }
+// }
+
+// impl<E: Engine> EngineDataSerializationWrite<E> for E::G1Affine {
+//     fn write<W: Write>(&self, writer: W) -> std::io::Result<()> {
+//         writer.write_all(self.into_uncompressed().as_ref())?;
+//     }
+// }
+
+pub fn read_curve_affine<G: CurveAffine, R: Read>(mut reader: R) -> std::io::Result<G> {
+    let mut repr = G::Uncompressed::empty();
+    reader.read_exact(repr.as_mut())?;
+
+    let e = repr
+        .into_affine()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+    Ok(e)
+}
+
+pub fn read_optional_curve_affine<G: CurveAffine, R: Read>(mut reader: R) -> std::io::Result<Option<G>> {
+    use crate::ff::PrimeFieldRepr;
+
+    let is_some = read_optional_flag(&mut reader)?;
+    if is_some {
+        let el = read_curve_affine(&mut reader)?;
+
+        Ok(Some(el))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn read_curve_affine_vector<G: CurveAffine, R: Read>(mut reader: R) -> std::io::Result<Vec<G>> {
+    let num_elements = reader.read_u64::<BigEndian>()?;
+    let mut elements = vec![];
+    for _ in 0..num_elements {
+        let el = read_curve_affine(&mut reader)?;
+        elements.push(el);
+    }
+
+    Ok(elements)
+}
+
+pub fn write_curve_affine<G: CurveAffine, W: Write>(p: &G, mut writer: W) -> std::io::Result<()> {
+    writer.write_all(p.into_uncompressed().as_ref())?;
+
+    Ok(())
+}
+
+pub fn write_optional_curve_affine<G: CurveAffine, W: Write>(p: &Option<G>, mut writer: W) -> std::io::Result<()> {
+    write_optional_flag(p.is_some(), &mut writer)?;
+    if let Some(p) = p.as_ref() {
+        write_curve_affine(p, &mut writer)?;
+    }
+
+    Ok(())
+}
+
+pub fn write_curve_affine_vec<G: CurveAffine, W: Write>(p: &[G], mut writer: W) -> std::io::Result<()> {
+    writer.write_u64::<BigEndian>(p.len() as u64)?;
+    for p in p.iter() {
+        write_curve_affine(p, &mut writer)?;
+    }
+    Ok(())
+}
+
 pub fn write_fr<F: PrimeField, W: Write>(el: &F, mut writer: W) -> std::io::Result<()> {
     use crate::ff::PrimeFieldRepr;
 
     let repr = el.into_repr();
     repr.write_be(&mut writer)?;
 
+    Ok(())
+}
+
+pub fn write_optional_fr<F: PrimeField, W: Write>(el: &Option<F>, mut writer: W) -> std::io::Result<()> {
+    use crate::ff::PrimeFieldRepr;
+
+    write_optional_flag(el.is_some(), &mut writer)?;
+    if let Some(el) = el.as_ref() {
+        write_fr(el, &mut writer)?;
+    }
+
+    Ok(())
+}
+
+pub fn write_fr_vec<F: PrimeField, W: Write>(p: &[F], mut writer: W) -> std::io::Result<()> {
+    writer.write_u64::<BigEndian>(p.len() as u64)?;
+    for p in p.iter() {
+        write_fr(p, &mut writer)?;
+    }
     Ok(())
 }
 
@@ -48,6 +167,19 @@ pub fn write_fr_raw<F: PrimeField, W: Write>(el: &F, mut writer: W) -> std::io::
     Ok(())
 }
 
+pub fn read_optional_fr<F: PrimeField, R: Read>(mut reader: R) -> std::io::Result<Option<F>> {
+    use crate::ff::PrimeFieldRepr;
+
+    let is_some = read_optional_flag(&mut reader)?;
+    if is_some {
+        let el = read_fr(&mut reader)?;
+
+        Ok(Some(el))
+    } else {
+        Ok(None)
+    }
+}
+
 pub fn read_fr<F: PrimeField, R: Read>(mut reader: R) -> std::io::Result<F> {
     use crate::ff::PrimeFieldRepr;
 
@@ -57,12 +189,104 @@ pub fn read_fr<F: PrimeField, R: Read>(mut reader: R) -> std::io::Result<F> {
     F::from_repr(repr).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
 }
 
+pub fn read_fr_vec<F: PrimeField, R: Read>(mut reader: R) -> std::io::Result<Vec<F>> {
+    let num_elements = reader.read_u64::<BigEndian>()?;
+    let mut elements = vec![];
+    for _ in 0..num_elements {
+        let el = read_fr(&mut reader)?;
+        elements.push(el);
+    }
+
+    Ok(elements)
+}
+
 pub fn read_fr_raw<F: PrimeField, R: Read>(mut reader: R) -> std::io::Result<F> {
     use crate::ff::PrimeFieldRepr;
     let mut repr = F::Repr::default();
     repr.read_be(&mut reader)?;
 
     F::from_raw_repr(repr).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+}
+
+pub fn read_optional_flag<R: Read>(mut reader: R) -> std::io::Result<bool> {
+    let value = reader.read_u64::<BigEndian>()?;
+    if value == 1 {
+        return Ok(true);
+    } else if value == 0 {
+        return Ok(false);
+    }
+    
+    panic!("invalid encoding of optional flag");
+}
+
+pub fn write_optional_flag<W: Write>(is_some: bool, mut writer: W) -> std::io::Result<()> {
+    if is_some {
+        writer.write_u64::<BigEndian>(1u64)?;
+    } else {
+        writer.write_u64::<BigEndian>(0u64)?;
+    }
+    
+    Ok(())
+}
+
+pub fn read_optional_polynomial_coeffs<F: PrimeField, R: Read>(mut reader: R) -> std::io::Result<Option<Polynomial<F, Coefficients>>> {
+    let is_some = read_optional_flag(&mut reader)?;
+    if is_some {
+        let p = read_polynomial_coeffs(&mut reader)?;
+
+        Ok(Some(p))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn read_optional_polynomial_values_unpadded<F: PrimeField, R: Read>(mut reader: R) -> std::io::Result<Option<Polynomial<F, Values>>> {
+    let is_some = read_optional_flag(&mut reader)?;
+    if is_some {
+        let p = read_polynomial_values_unpadded(&mut reader)?;
+
+        Ok(Some(p))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn write_optional_polynomial<F: PrimeField, P: PolynomialForm, W: Write>(p: &Option<Polynomial<F, P>>, mut writer: W) -> std::io::Result<()> {
+    write_optional_flag(p.is_some(), &mut writer)?;
+    if let Some(p) = p.as_ref() {
+        write_polynomial(p, &mut writer)?;
+    }
+    Ok(())
+}
+
+pub fn read_polynomials_coeffs_vec<F: PrimeField, R: Read>(mut reader: R) -> std::io::Result<Vec<Polynomial<F, Coefficients>>> {
+    let num_polys = reader.read_u64::<BigEndian>()?;
+    let mut polys = vec![];
+    for _ in 0..num_polys {
+        let p = read_polynomial_coeffs(&mut reader)?;
+        polys.push(p);
+    }
+
+    Ok(polys)
+}
+
+pub fn read_polynomials_values_unpadded_vec<F: PrimeField, R: Read>(mut reader: R) -> std::io::Result<Vec<Polynomial<F, Values>>> {
+    let num_polys = reader.read_u64::<BigEndian>()?;
+    let mut polys = vec![];
+    for _ in 0..num_polys {
+        let p = read_polynomial_values_unpadded(&mut reader)?;
+        polys.push(p);
+    }
+
+    Ok(polys)
+}
+
+pub fn write_polynomials_vec<F: PrimeField, P: PolynomialForm, W: Write>(p: &[Polynomial<F, P>], mut writer: W) -> std::io::Result<()> {
+    writer.write_u64::<BigEndian>(p.len() as u64)?;
+    for p in p.iter() {
+        write_polynomial(p, &mut writer)?;
+    }
+    Ok(())
 }
 
 pub fn write_polynomial<F: PrimeField, P: PolynomialForm, W: Write>(p: &Polynomial<F, P>, mut writer: W) -> std::io::Result<()> {
@@ -599,9 +823,8 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> VerificationKey<E, P> {
             new.permutation_commitments.push(commitment);
         }
 
-        let domain = Domain::<E::Fr>::new_for_size(setup.n.next_power_of_two() as u64)?;
         new.non_residues
-            .extend(super::utils::make_non_residues(P::STATE_WIDTH - 1, &domain));
+            .extend(super::utils::make_non_residues::<E::Fr>(P::STATE_WIDTH - 1));
 
         Ok(new)
     }

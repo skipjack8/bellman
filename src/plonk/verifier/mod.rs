@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::plonk::cs::gates::*;
 use crate::plonk::cs::*;
 
-use crate::multicore::*;
+use crate::worker::*;
 use super::polynomials::*;
 use super::domains::*;
 use crate::plonk::commitments::*;
@@ -1123,7 +1123,7 @@ mod test {
         use crate::pairing::ff::ScalarEngine;
         use crate::pairing::CurveProjective;
         use crate::multiexp::*;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::source::*;
         use std::sync::Arc;
         use futures::{Future};
@@ -1308,7 +1308,7 @@ mod test {
         use crate::pairing::ff::ScalarEngine;
         use crate::pairing::CurveProjective;
         use crate::multiexp::*;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::source::*;
         use std::sync::Arc;
         use futures::{Future};
@@ -1347,7 +1347,7 @@ mod test {
         use crate::pairing::ff::ScalarEngine;
         use crate::pairing::CurveProjective;
         use crate::multiexp::*;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::source::*;
         use std::sync::Arc;
         use futures::{Future};
@@ -1382,7 +1382,7 @@ mod test {
         use crate::pairing::ff::ScalarEngine;
         use crate::pairing::CurveProjective;
         use std::time::Instant;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
 
         let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);

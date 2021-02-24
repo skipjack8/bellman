@@ -57,7 +57,6 @@ use cfg_if;
 /// - accumulators over each set of buckets will have an implicit factor of `(2^c)^i`, so before summing thme up
 /// "higher" accumulators must be doubled `c` times
 ///
-#[cfg(not(feature = "nightly"))]
 fn multiexp_inner<Q, D, G, S>(
     pool: &Worker,
     bases: S,
@@ -143,54 +142,8 @@ fn multiexp_inner<Q, D, G, S>(
     this
 }
 
-
-cfg_if! {
-    if #[cfg(feature = "nightly")] {
-        #[inline(always)]
-        fn multiexp_inner_impl<Q, D, G, S>(
-            pool: &Worker,
-            bases: S,
-            density_map: D,
-            exponents: Arc<Vec<<G::Scalar as PrimeField>::Repr>>,
-            skip: u32,
-            c: u32,
-            handle_trivial: bool
-        ) -> WorkerFuture< <G as CurveAffine>::Projective, SynthesisError>
-            where for<'a> &'a Q: QueryDensity,
-                D: Send + Sync + 'static + Clone + AsRef<Q>,
-                G: CurveAffine,
-                S: SourceBuilder<G>
-        {
-            // multiexp_inner_with_prefetch(pool, bases, density_map, exponents, skip, c, handle_trivial)
-            multiexp_inner_with_prefetch_stable(pool, bases, density_map, exponents, skip, c, handle_trivial)
-        }
-    } else {
-        #[inline(always)]
-        fn multiexp_inner_impl<Q, D, G, S>(
-            pool: &Worker,
-            bases: S,
-            density_map: D,
-            exponents: Arc<Vec<<G::Scalar as PrimeField>::Repr>>,
-            skip: u32,
-            c: u32,
-            handle_trivial: bool
-        ) -> WorkerFuture< <G as CurveAffine>::Projective, SynthesisError>
-            where for<'a> &'a Q: QueryDensity,
-                D: Send + Sync + 'static + Clone + AsRef<Q>,
-                G: CurveAffine,
-                S: SourceBuilder<G>
-        {
-            // multiexp_inner(pool, bases, density_map, exponents, skip, c, handle_trivial)
-            multiexp_inner_with_prefetch_stable(pool, bases, density_map, exponents, skip, c, handle_trivial)
-        }
-    }  
-}
-
-#[cfg(feature = "nightly")]
-extern crate prefetch;
-
-#[cfg(feature = "nightly")]
-fn multiexp_inner_with_prefetch<Q, D, G, S>(
+#[inline(always)]
+fn multiexp_inner_impl<Q, D, G, S>(
     pool: &Worker,
     bases: S,
     density_map: D,
@@ -200,92 +153,12 @@ fn multiexp_inner_with_prefetch<Q, D, G, S>(
     handle_trivial: bool
 ) -> WorkerFuture< <G as CurveAffine>::Projective, SynthesisError>
     where for<'a> &'a Q: QueryDensity,
-          D: Send + Sync + 'static + Clone + AsRef<Q>,
-          G: CurveAffine,
-          S: SourceBuilder<G>
+        D: Send + Sync + 'static + Clone + AsRef<Q>,
+        G: CurveAffine,
+        S: SourceBuilder<G>
 {
-    use prefetch::prefetch::*;
-    // Perform this region of the multiexp
-    let this = {
-        // This is a Pippenger’s algorithm
-        pool.compute(move || {
-            // Accumulate the result
-            let mut acc = G::Projective::zero();
-
-            // Build a source for the bases
-            let mut bases = bases.new();
-
-            // Create buckets to place remainders s mod 2^c,
-            // it will be 2^c - 1 buckets (no bucket for zeroes)
-
-            // Create space for the buckets
-            let mut buckets = vec![<G as CurveAffine>::Projective::zero(); (1 << c) - 1];
-
-            let zero = <G::Engine as ScalarEngine>::Fr::zero().into_repr();
-            let one = <G::Engine as ScalarEngine>::Fr::one().into_repr();
-            let padding = Arc::new(vec![zero]);
-
-            let mask = 1 << c;
-
-            // Sort the bases into buckets
-            for ((&exp, &next_exp), density) in exponents.iter()
-                        .zip(exponents.iter().skip(1).chain(padding.iter()))
-                        .zip(density_map.as_ref().iter()) {
-                // no matter what happens - prefetch next bucket
-                if next_exp != zero && next_exp != one {
-                    let mut next_exp = next_exp;
-                    next_exp.shr(skip);
-                    let next_exp = next_exp.as_ref()[0] % mask;
-                    if next_exp != 0 {
-                        let p: *const <G as CurveAffine>::Projective = &buckets[(next_exp - 1) as usize];
-                        prefetch::<Write, High, Data, _>(p);
-                    }
-                    
-                }
-                // Go over density and exponents
-                if density {
-                    if exp == zero {
-                        bases.skip(1)?;
-                    } else if exp == one {
-                        if handle_trivial {
-                            bases.add_assign_mixed(&mut acc)?;
-                        } else {
-                            bases.skip(1)?;
-                        }
-                    } else {
-                        // Place multiplication into the bucket: Separate s * P as 
-                        // (s/2^c) * P + (s mod 2^c) P
-                        // First multiplication is c bits less, so one can do it,
-                        // sum results from different buckets and double it c times,
-                        // then add with (s mod 2^c) P parts
-                        let mut exp = exp;
-                        exp.shr(skip);
-                        let exp = exp.as_ref()[0] % mask;
-
-                        if exp != 0 {
-                            bases.add_assign_mixed(&mut buckets[(exp - 1) as usize])?;
-                        } else {
-                            bases.skip(1)?;
-                        }
-                    }
-                }
-            }
-
-            // Summation by parts
-            // e.g. 3a + 2b + 1c = a +
-            //                    (a) + b +
-            //                    ((a) + b) + c
-            let mut running_sum = G::Projective::zero();
-            for exp in buckets.into_iter().rev() {
-                running_sum.add_assign(&exp);
-                acc.add_assign(&running_sum);
-            }
-
-            Ok(acc)
-        })
-    };
-    
-    this
+    multiexp_inner(pool, bases, density_map, exponents, skip, c, handle_trivial)
+    // multiexp_inner_with_prefetch_stable(pool, bases, density_map, exponents, skip, c, handle_trivial)
 }
 
 fn multiexp_inner_with_prefetch_stable<Q, D, G, S>(
@@ -326,7 +199,7 @@ fn multiexp_inner_with_prefetch_stable<Q, D, G, S>(
             let one = <G::Engine as ScalarEngine>::Fr::one().into_repr();
             let padding = Arc::new(vec![zero]);
 
-            let mask = 1 << c;
+            let mask = (1u64 << c) - 1;
 
             // Sort the bases into buckets
             for ((&exp, &next_exp), density) in exponents.iter()
@@ -336,10 +209,10 @@ fn multiexp_inner_with_prefetch_stable<Q, D, G, S>(
                 if next_exp != zero && next_exp != one {
                     let mut next_exp = next_exp;
                     next_exp.shr(skip);
-                    let next_exp = next_exp.as_ref()[0] % mask;
+                    let next_exp = next_exp.as_ref()[0] & mask;
                     if next_exp != 0 {
                         let p: *const <G as CurveAffine>::Projective = &buckets[(next_exp - 1) as usize];
-                        crate::prefetch::prefetch_l3_pointer(p);
+                        crate::prefetch::prefetch_l1_pointer(p);
                     }
                     
                 }
@@ -389,6 +262,284 @@ fn multiexp_inner_with_prefetch_stable<Q, D, G, S>(
     this
 }
 
+
+/// Perform multi-exponentiation. The caller is responsible for ensuring the
+/// query size is the same as the number of exponents.
+pub fn future_based_multiexp<G: CurveAffine>(
+    pool: &Worker,
+    bases: Arc<Vec<G>>,
+    exponents: Arc<Vec<<G::Scalar as PrimeField>::Repr>>
+) -> ChunksJoiner< <G as CurveAffine>::Projective >
+{
+    assert!(exponents.len() <= bases.len());
+    let c = if exponents.len() < 32 {
+        3u32
+    } else {
+        let mut width = (f64::from(exponents.len() as u32)).ln().ceil() as u32;
+        let mut num_chunks = <G::Scalar as PrimeField>::NUM_BITS / width;
+        if <G::Scalar as PrimeField>::NUM_BITS % width != 0 {
+            num_chunks += 1;
+        }
+
+        if num_chunks < pool.cpus as u32 {
+            width = <G::Scalar as PrimeField>::NUM_BITS / (pool.cpus as u32);
+            if <G::Scalar as PrimeField>::NUM_BITS % (pool.cpus as u32) != 0 {
+                width += 1;
+            }
+        }
+        
+        width
+    };
+
+    let mut skip = 0;
+    let mut futures = Vec::with_capacity((<G::Engine as ScalarEngine>::Fr::NUM_BITS / c + 1) as usize);
+
+    while skip < <G::Engine as ScalarEngine>::Fr::NUM_BITS {
+        let chunk_future = if skip == 0 {
+            future_based_dense_multiexp_impl(pool, bases.clone(), exponents.clone(), 0, c, true)
+        } else {
+            future_based_dense_multiexp_impl(pool, bases.clone(), exponents.clone(), skip, c, false)
+        };
+
+        futures.push(chunk_future);
+        skip += c;
+    }
+
+    let join = join_all(futures);
+
+    ChunksJoiner {
+        join,
+        c
+    } 
+}
+
+
+/// Perform multi-exponentiation. The caller is responsible for ensuring the
+/// query size is the same as the number of exponents.
+pub fn future_based_dense_multiexp_over_fixed_width_windows<G: CurveAffine>(
+    pool: &Worker,
+    bases: Arc<Vec<G>>,
+    exponents: Arc<Vec<<G::Scalar as PrimeField>::Repr>>,
+    c: u32
+) -> ChunksJoiner< <G as CurveAffine>::Projective >
+{
+    assert!(exponents.len() <= bases.len());
+
+    let mut skip = 0;
+    let mut futures = Vec::with_capacity((<G::Engine as ScalarEngine>::Fr::NUM_BITS / c + 1) as usize);
+
+    while skip < <G::Engine as ScalarEngine>::Fr::NUM_BITS {
+        let chunk_future = if skip == 0 {
+            // future_based_buffered_dense_multiexp_impl(pool, bases.clone(), exponents.clone(), 0, c, true)
+            future_based_dense_multiexp_impl(pool, bases.clone(), exponents.clone(), 0, c, true)
+        } else {
+            // future_based_buffered_dense_multiexp_impl(pool, bases.clone(), exponents.clone(), skip, c, false)
+            future_based_dense_multiexp_impl(pool, bases.clone(), exponents.clone(), skip, c, false)
+        };
+
+        futures.push(chunk_future);
+        skip += c;
+    }
+
+    let join = join_all(futures);
+
+    ChunksJoiner {
+        join,
+        c
+    } 
+}
+
+fn future_based_dense_multiexp_impl<G: CurveAffine>(
+    pool: &Worker,
+    bases: Arc<Vec<G>>,
+    exponents: Arc<Vec<<G::Scalar as PrimeField>::Repr>>,
+    skip: u32,
+    c: u32,
+    handle_trivial: bool
+) -> WorkerFuture< <G as CurveAffine>::Projective, SynthesisError>
+{
+    // Perform this region of the multiexp
+    let this = {
+        let bases = bases.clone();
+        let exponents = exponents.clone();
+        let bases = bases.clone();
+
+        // This is a Pippenger’s algorithm
+        pool.compute(move || {
+            // Accumulate the result
+            let mut acc = G::Projective::zero();
+
+            // Create buckets to place remainders s mod 2^c,
+            // it will be 2^c - 1 buckets (no bucket for zeroes)
+
+            // Create space for the buckets
+            let mut buckets = vec![<G as CurveAffine>::Projective::zero(); (1 << c) - 1];
+
+            let zero = <G::Engine as ScalarEngine>::Fr::zero().into_repr();
+            let one = <G::Engine as ScalarEngine>::Fr::one().into_repr();
+            let padding = Arc::new(vec![zero]);
+
+            let mask = 1 << c;
+
+            // Sort the bases into buckets
+            for ((&exp, base), &next_exp) in exponents.iter()
+                        .zip(bases.iter())
+                        .zip(exponents.iter().skip(1).chain(padding.iter())) {
+                // no matter what happens - prefetch next bucket
+                if next_exp != zero && next_exp != one {
+                    let mut next_exp = next_exp;
+                    next_exp.shr(skip);
+                    let next_exp = next_exp.as_ref()[0] % mask;
+                    if next_exp != 0 {
+                        let p: *const <G as CurveAffine>::Projective = &buckets[(next_exp - 1) as usize];
+                        crate::prefetch::prefetch_l1_pointer(p);
+                    }
+                    
+                }
+                // Go over density and exponents
+                if exp == zero {
+                    continue
+                } else if exp == one {
+                    if handle_trivial {
+                        acc.add_assign_mixed(base);
+                    } else {
+                        continue
+                    }
+                } else {
+                    // Place multiplication into the bucket: Separate s * P as 
+                    // (s/2^c) * P + (s mod 2^c) P
+                    // First multiplication is c bits less, so one can do it,
+                    // sum results from different buckets and double it c times,
+                    // then add with (s mod 2^c) P parts
+                    let mut exp = exp;
+                    exp.shr(skip);
+                    let exp = exp.as_ref()[0] % mask;
+
+                    if exp != 0 {
+                        (&mut buckets[(exp - 1) as usize]).add_assign_mixed(base);
+                    } else {
+                        continue;
+                    }
+                }
+            }
+
+            // Summation by parts
+            // e.g. 3a + 2b + 1c = a +
+            //                    (a) + b +
+            //                    ((a) + b) + c
+            let mut running_sum = G::Projective::zero();
+            for exp in buckets.into_iter().rev() {
+                running_sum.add_assign(&exp);
+                acc.add_assign(&running_sum);
+            }
+
+            Ok(acc)
+        })
+    };
+
+    this
+}
+
+fn future_based_buffered_dense_multiexp_impl<G: CurveAffine>(
+    pool: &Worker,
+    bases: Arc<Vec<G>>,
+    exponents: Arc<Vec<<G::Scalar as PrimeField>::Repr>>,
+    skip: u32,
+    c: u32,
+    handle_trivial: bool
+) -> WorkerFuture< <G as CurveAffine>::Projective, SynthesisError>
+{
+    // Perform this region of the multiexp
+    let this = {
+        let bases = bases.clone();
+        let exponents = exponents.clone();
+        let bases = bases.clone();
+
+        // This is a Pippenger’s algorithm
+        pool.compute(move || {
+            // Accumulate the result
+            let mut acc = G::Projective::zero();
+
+            // Create buckets to place remainders s mod 2^c,
+            // it will be 2^c - 1 buckets (no bucket for zeroes)
+
+            // Create space for the buckets
+            let mut buckets = vec![<G as CurveAffine>::Projective::zero(); (1 << c) - 1];
+
+            let zero = <G::Engine as ScalarEngine>::Fr::zero().into_repr();
+            let one = <G::Engine as ScalarEngine>::Fr::one().into_repr();
+
+            let mask = 1 << c;
+
+            const BUFFER_SIZE: usize = 64;
+            let mut buffers: Vec<Vec<G>> = vec![Vec::with_capacity(BUFFER_SIZE); (1 << c) - 1];
+
+            // Sort the bases into buckets
+            for (&exp, &base) in exponents.iter()
+                        .zip(bases.iter()) {
+                // Go over density and exponents
+                if exp == zero {
+                    continue
+                } else if exp == one {
+                    if handle_trivial {
+                        acc.add_assign_mixed(&base);
+                    } else {
+                        continue
+                    }
+                } else {
+                    // Place multiplication into the bucket: Separate s * P as 
+                    // (s/2^c) * P + (s mod 2^c) P
+                    // First multiplication is c bits less, so one can do it,
+                    // sum results from different buckets and double it c times,
+                    // then add with (s mod 2^c) P parts
+                    let mut exp = exp;
+                    exp.shr(skip);
+                    let exp = exp.as_ref()[0] % mask;
+
+                    if exp != 0 {
+                        let idx = (exp - 1) as usize;
+                        if buffers[idx].len() == BUFFER_SIZE {
+                            let mut el = buckets[idx];
+                            for b in buffers[idx].iter(){
+                                el.add_assign_mixed(&b);
+                            }
+                            buffers[idx].truncate(0);
+                            buckets[idx] = el;
+                        }
+
+                        buffers[idx].push(base);
+                    } else {
+                        continue;
+                    }
+                }
+            }
+
+            // we have some unprocessed left, so add them to the buckets
+            for (idx, buffer) in buffers.into_iter().enumerate() {
+                let mut el = buckets[idx];
+                for b in buffer.into_iter() {
+                    el.add_assign_mixed(&b);
+                }
+                buckets[idx] = el;
+            }
+
+            // Summation by parts
+            // e.g. 3a + 2b + 1c = a +
+            //                    (a) + b +
+            //                    ((a) + b) + c
+            let mut running_sum = G::Projective::zero();
+            for exp in buckets.into_iter().rev() {
+                running_sum.add_assign(&exp);
+                acc.add_assign(&running_sum);
+            }
+
+            Ok(acc)
+        })
+    };
+
+    this
+}
+
 /// Perform multi-exponentiation. The caller is responsible for ensuring the
 /// query size is the same as the number of exponents.
 pub fn multiexp<Q, D, G, S>(
@@ -408,6 +559,47 @@ pub fn multiexp<Q, D, G, S>(
         (f64::from(exponents.len() as u32)).ln().ceil() as u32
     };
 
+    if let Some(query_size) = density_map.as_ref().get_query_size() {
+        // If the density map has a known query size, it should not be
+        // inconsistent with the number of exponents.
+
+        assert!(query_size == exponents.len());
+    }
+
+    let mut skip = 0;
+    let mut futures = Vec::with_capacity((<G::Engine as ScalarEngine>::Fr::NUM_BITS / c + 1) as usize);
+
+    while skip < <G::Engine as ScalarEngine>::Fr::NUM_BITS {
+        let chunk_future = if skip == 0 {
+            multiexp_inner_impl(pool, bases.clone(), density_map.clone(), exponents.clone(), 0, c, true)
+        } else {
+            multiexp_inner_impl(pool, bases.clone(), density_map.clone(), exponents.clone(), skip, c, false)
+        };
+
+        futures.push(chunk_future);
+        skip += c;
+    }
+
+    let join = join_all(futures);
+
+    ChunksJoiner {
+        join,
+        c
+    } 
+}
+
+pub(crate) fn multiexp_with_fixed_width<Q, D, G, S>(
+    pool: &Worker,
+    bases: S,
+    density_map: D,
+    exponents: Arc<Vec<<<G::Engine as ScalarEngine>::Fr as PrimeField>::Repr>>,
+    c: u32
+) -> ChunksJoiner< <G as CurveAffine>::Projective >
+    where for<'a> &'a Q: QueryDensity,
+          D: Send + Sync + 'static + Clone + AsRef<Q>,
+          G: CurveAffine,
+          S: SourceBuilder<G>
+{
     if let Some(query_size) = density_map.as_ref().get_query_size() {
         // If the density map has a known query size, it should not be
         // inconsistent with the number of exponents.
@@ -502,12 +694,20 @@ pub fn dense_multiexp<G: CurveAffine>(
     if exponents.len() != bases.len() {
         return Err(SynthesisError::AssignmentMissing);
     }
+    // do some heuristics here
+    // we proceed chunks of all points, and all workers do the same work over 
+    // some scalar width, so to have expected number of additions into buckets to 1
+    // we have to take log2 from the expected chunk(!) length
     let c = if exponents.len() < 32 {
         3u32
     } else {
-        (f64::from(exponents.len() as u32)).ln().ceil() as u32
+        let chunk_len = pool.get_chunk_size(exponents.len());
+        (f64::from(chunk_len as u32)).ln().ceil() as u32
+
+        // (f64::from(exponents.len() as u32)).ln().ceil() as u32
     };
 
+    // dense_multiexp_inner_unrolled_with_prefetch(pool, bases, exponents, 0, c, true)
     dense_multiexp_inner(pool, bases, exponents, 0, c, true)
 }
 
@@ -609,147 +809,27 @@ fn dense_multiexp_inner<G: CurveAffine>(
     }
 }
 
-
-
-/// Perform multi-exponentiation. The caller is responsible for ensuring that
-/// the number of bases is the same as the number of exponents.
-#[allow(dead_code)]
-pub fn dense_multiexp_consume<G: CurveAffine>(
-    pool: &Worker,
-    bases: & [G],
-    exponents: Vec<<<G::Engine as ScalarEngine>::Fr as PrimeField>::Repr>
-) -> Result<<G as CurveAffine>::Projective, SynthesisError>
-{
-    if exponents.len() != bases.len() {
-        return Err(SynthesisError::AssignmentMissing);
-    }
-    let c = if exponents.len() < 32 {
-        3u32
+fn get_window_size_for_length(length: usize, chunk_length: usize) -> u32 {
+    if length < 32 {
+        return 3u32;
     } else {
-        (f64::from(exponents.len() as u32)).ln().ceil() as u32
-    };
-
-    dense_multiexp_inner_consume(pool, bases, exponents, c)
-}
-
-fn dense_multiexp_inner_consume<G: CurveAffine>(
-    pool: &Worker,
-    bases: & [G],
-    exponents: Vec<<<G::Engine as ScalarEngine>::Fr as PrimeField>::Repr>,
-    c: u32,
-) -> Result<<G as CurveAffine>::Projective, SynthesisError>
-{   
-    // spawn exactly required number of threads at the time, not more
-    // each thread mutates part of the exponents and walks over the same range of bases
-
-    use std::sync::mpsc::{channel};
-
-    let (tx, rx) = channel();
-
-    pool.scope(bases.len(), |scope, chunk| {
-        for (base, exp) in bases.chunks(chunk).zip(exponents.chunks(chunk)) {
-            let tx = tx.clone();
-            scope.spawn(move |_| {
-                let mut skip = 0;
-
-                let mut result = G::Projective::zero();
-
-                let mut buckets = vec![<G as CurveAffine>::Projective::zero(); 1 << c];
-
-                let zero = <G::Engine as ScalarEngine>::Fr::zero().into_repr();
-                // let one = <G::Engine as ScalarEngine>::Fr::one().into_repr();
-
-                let padding = Some(<G::Engine as ScalarEngine>::Fr::zero().into_repr());
-                let mask: u64 = (1 << c) - 1;
-
-                loop {
-                    let mut next_bucket_index = (exp[0].as_ref()[0] & mask) as usize;
-                    let exp_next_constant_iter = exp.iter().skip(1);
-                    // let this_exp_to_use = exp.iter();
-
-                    let mut acc = G::Projective::zero();
-
-                    // for ((base, &this_exp_to_use), &next_exp_to_prefetch) in base.iter()
-                    //                         .zip(this_exp_to_use)
-                    //                         .zip(exp_next_constant_iter.chain(padding.iter()))
-                    //     {
-                    for (base, &next_exp_to_prefetch) in base.iter()
-                            .zip(exp_next_constant_iter.chain(padding.iter()))
-                    {
-                        let this_bucket_index = next_bucket_index;
-
-                        {
-                            // if next_exp_to_prefetch != zero && next_exp_to_prefetch != one {
-                            if next_exp_to_prefetch != zero {
-                                let mut e = next_exp_to_prefetch;
-                                e.shr(skip);
-                                next_bucket_index = (next_exp_to_prefetch.as_ref()[0] & mask) as usize;
-
-                                if next_bucket_index > 0 {
-                                    // crate::prefetch::prefetch_l3(&buckets[next_bucket_index]);
-                                    crate::prefetch::prefetch_l3_pointer(&buckets[next_bucket_index] as *const _);
-                                }
-                            } else {
-                                next_bucket_index = 0;
-                            }
-                        }
-
-                        if this_bucket_index > 0 {
-                            buckets[this_bucket_index].add_assign_mixed(base);
-                        }
-
-                        // // now add base to the bucket that we've 
-                        // if this_bucket_index > 1 {
-                        //     buckets[this_bucket_index].add_assign_mixed(base);
-                        // } else {
-                        //     acc.add_assign_mixed(base);
-                        // }
-                    }
-
-                    // buckets are filled with the corresponding accumulated value, now sum
-                    let mut running_sum = G::Projective::zero();
-                    // now start from the last one and add
-                    for exp in buckets.iter().skip(1).rev() {
-                        running_sum.add_assign(&exp);
-                        acc.add_assign(&running_sum);
-                    }
-
-                    for _ in 0..skip {
-                        acc.double();
-                    }
-
-                    result.add_assign(&acc);
-
-                    skip += c;
-                    
-                    if skip >= <G::Engine as ScalarEngine>::Fr::NUM_BITS {
-                        // next chunk is the last one
-                        tx.send(result).unwrap();
-
-                        break;
-                    } else {
-                        buckets.truncate(0);
-                        buckets.resize(1 << c, <G as CurveAffine>::Projective::zero());
-                    }
-                }
-            });
+        let exact = (f64::from(chunk_length as u32)).ln();
+        let floor = exact.floor();
+        if exact > floor + 0.5f64 {
+            return exact.ceil() as u32;
+        } else {
+            return floor as u32;
         }
-    });
 
-    // do something with rx
-
-    let mut result = <G as CurveAffine>::Projective::zero();
-
-    for value in rx.try_iter() {
-        result.add_assign(&value);
-    }
-
-    Ok(result)
+        // (f64::from(chunk_length as u32)).ln().ceil() as u32
+        // (f64::from(length as u32)).ln().ceil() as u32
+    };
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
 
-#[test]
-fn test_new_multiexp_with_bls12() {
     fn naive_multiexp<G: CurveAffine>(
         bases: Arc<Vec<G>>,
         exponents: Arc<Vec<<G::Scalar as PrimeField>::Repr>>
@@ -766,183 +846,160 @@ fn test_new_multiexp_with_bls12() {
         acc
     }
 
-    use rand::{self, Rand};
-    use crate::pairing::bls12_381::Bls12;
+    #[test]
+    fn test_new_multiexp_with_bls12() {
+        use rand::{self, Rand};
+        use crate::pairing::bls12_381::Bls12;
 
-    use self::futures::executor::block_on;
+        use self::futures::executor::block_on;
 
-    const SAMPLES: usize = 1 << 14;
+        const SAMPLES: usize = 1 << 14;
 
-    let rng = &mut rand::thread_rng();
-    let v = Arc::new((0..SAMPLES).map(|_| <Bls12 as ScalarEngine>::Fr::rand(rng).into_repr()).collect::<Vec<_>>());
-    let g = Arc::new((0..SAMPLES).map(|_| <Bls12 as Engine>::G1::rand(rng).into_affine()).collect::<Vec<_>>());
+        let rng = &mut rand::thread_rng();
+        let v = Arc::new((0..SAMPLES).map(|_| <Bls12 as ScalarEngine>::Fr::rand(rng).into_repr()).collect::<Vec<_>>());
+        let g = Arc::new((0..SAMPLES).map(|_| <Bls12 as Engine>::G1::rand(rng).into_affine()).collect::<Vec<_>>());
 
-    let naive = naive_multiexp(g.clone(), v.clone());
+        let naive = naive_multiexp(g.clone(), v.clone());
 
-    let pool = Worker::new();
+        let pool = Worker::new();
 
-    let fast = block_on(
-        multiexp(
+        let fast = block_on(
+            multiexp(
+                &pool,
+                (g, 0),
+                FullDensity,
+                v
+            )
+        ).unwrap();
+
+        assert_eq!(naive, fast);
+    }
+
+
+    #[test]
+    fn test_valid_bn254_multiexp() {
+        use rand::{self, Rand};
+        use crate::pairing::bn256::Bn256;
+
+        const SAMPLES: usize = 1 << 22;
+
+        let pool = Worker::new();
+
+        let rng = &mut rand::thread_rng();
+        let v = (0..SAMPLES).map(|_| <Bn256 as ScalarEngine>::Fr::rand(rng).into_repr()).collect::<Vec<_>>();
+        let g = (0..SAMPLES).map(|_| <Bn256 as Engine>::G1::rand(rng).into_affine()).collect::<Vec<_>>();
+        let dense = dense_multiexp(
             &pool,
-            (g, 0),
-            FullDensity,
-            v
-        )
-    ).unwrap();
+            &g,
+            &v,
+        ).unwrap();
 
-    assert_eq!(naive, fast);
-}
+        let v = Arc::new(v);
+        let g = Arc::new(g);
 
-#[test]
-#[ignore]
-fn test_new_multexp_speed_with_bn256() {
-    use rand::{self, Rand};
-    use crate::pairing::bn256::Bn256;
-    use num_cpus;
+        let naive = naive_multiexp(g.clone(), v.clone());
 
-    let cpus = num_cpus::get();
-    const SAMPLES: usize = 1 << 22;
+        assert_eq!(dense, naive);
 
-    let rng = &mut rand::thread_rng();
-    let v = Arc::new((0..SAMPLES).map(|_| <Bn256 as ScalarEngine>::Fr::rand(rng).into_repr()).collect::<Vec<_>>());
-    let g = Arc::new((0..SAMPLES).map(|_| <Bn256 as Engine>::G1::rand(rng).into_affine()).collect::<Vec<_>>());
+        use self::futures::executor::block_on;
 
-    let pool = Worker::new();
-
-    use self::futures::executor::block_on;
-
-    let start = std::time::Instant::now();
-
-    let _fast = block_on(
-        multiexp(
+        let fast_dense = future_based_multiexp(
             &pool,
-            (g, 0),
-            FullDensity,
-            v
-        )
-    ).unwrap();
+            g.clone(),
+            v.clone()
+        ).wait().unwrap();
 
+        assert_eq!(naive, fast_dense);
 
-    let duration_ns = start.elapsed().as_nanos() as f64;
-    println!("Elapsed {} ns for {} samples", duration_ns, SAMPLES);
-    let time_per_sample = duration_ns/(SAMPLES as f64);
-    println!("Tested on {} samples on {} CPUs with {} ns per multiplication", SAMPLES, cpus, time_per_sample);
-}
+        let fast = block_on(
+            multiexp(
+                &pool,
+                (g, 0),
+                FullDensity,
+                v
+            )
+        ).unwrap();
 
+        assert_eq!(naive, fast);
+    }
 
-#[test]
-fn test_dense_multiexp_vs_new_multiexp() {
-    use rand::{XorShiftRng, SeedableRng, Rand, Rng};
-    use crate::pairing::bn256::Bn256;
-    use num_cpus;
+    #[test]
+    #[ignore]
+    fn test_new_multexp_speed_with_bn256() {
+        
+        use rand::{self, Rand};
+        use crate::pairing::bn256::Bn256;
+        use num_cpus;
 
-    // const SAMPLES: usize = 1 << 22;
-    const SAMPLES: usize = 1 << 16;
-    let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let cpus = num_cpus::get();
+        const SAMPLES: usize = 1 << 22;
 
-    let v = (0..SAMPLES).map(|_| <Bn256 as ScalarEngine>::Fr::rand(rng).into_repr()).collect::<Vec<_>>();
-    let g = (0..SAMPLES).map(|_| <Bn256 as Engine>::G1::rand(rng).into_affine()).collect::<Vec<_>>();
+        let rng = &mut rand::thread_rng();
+        let v = Arc::new((0..SAMPLES).map(|_| <Bn256 as ScalarEngine>::Fr::rand(rng).into_repr()).collect::<Vec<_>>());
+        let g = Arc::new((0..SAMPLES).map(|_| <Bn256 as Engine>::G1::rand(rng).into_affine()).collect::<Vec<_>>());
 
-    println!("Done generating test points and scalars");
+        let pool = Worker::new();
 
-    let pool = Worker::new();
+        use self::futures::executor::block_on;
 
-    let start = std::time::Instant::now();
+        let start = std::time::Instant::now();
 
-    let dense = dense_multiexp(
-        &pool, &g, &v.clone()).unwrap();
+        let _fast = block_on(
+            multiexp(
+                &pool,
+                (g, 0),
+                FullDensity,
+                v
+            )
+        ).unwrap();
 
-    let duration_ns = start.elapsed().as_nanos() as f64;
-    println!("{} ns for dense for {} samples", duration_ns, SAMPLES);
+        let duration_ns = start.elapsed().as_nanos() as f64;
+        println!("Elapsed {} ns for {} samples", duration_ns, SAMPLES);
+        let time_per_sample = duration_ns/(SAMPLES as f64);
+        println!("Tested on {} samples on {} CPUs with {} ns per multiplication", SAMPLES, cpus, time_per_sample);
+    }
 
-    use self::futures::executor::block_on;
+    fn calculate_parameters(size: usize, threads: usize, bits: u32) {
+        let mut chunk_len = size / threads;
+        if size / threads != 0 {
+            chunk_len += 1;
+        }
+        let raw_size = (f64::from(chunk_len as u32)).ln();
+        let new_window_size = if raw_size.floor() + 0.5 < raw_size {
+            raw_size.ceil() as u32
+        } else {
+            raw_size.floor() as u32
+        };
+        let window_size = (f64::from(chunk_len as u32)).ln().ceil() as u32;
 
-    let start = std::time::Instant::now();
+        let mut num_windows = bits / window_size;
+        let leftover = bits % window_size;
+        if leftover != 0 {
+            num_windows += 1;
+        }
 
-    let sparse = block_on(
-        multiexp(
-            &pool,
-            (Arc::new(g), 0),
-            FullDensity,
-            Arc::new(v)
-        )
-    ).unwrap();
+        let uncompensated_window = (f64::from(size as u32)).ln().ceil() as u32;
+        let mut num_uncompensated_windows = bits / uncompensated_window;
+        let uncompensated_leftover = bits % uncompensated_window;
+        if uncompensated_leftover != 0 {
+            num_uncompensated_windows += 1;
+        }
 
-    let duration_ns = start.elapsed().as_nanos() as f64;
-    println!("{} ns for sparse for {} samples", duration_ns, SAMPLES);
+        println!("For size {} and {} cores: chunk len {}, {} windows, average window {} bits, leftover {} bits. Alternative window size = {}", size, threads, chunk_len, num_windows, window_size, leftover, new_window_size);
+        // println!("Raw window size = {}", raw_size);
+        // println!("Uncompensated: {} windows, arevage window {} bits, leftover {} bits", num_uncompensated_windows, uncompensated_window, uncompensated_leftover);
 
-    assert_eq!(dense, sparse);
-}
+        // (f64::from(exponents.len() as u32)).ln().ceil() as u32
+    }
 
-
-#[test]
-fn test_bench_sparse_multiexp() {
-    use rand::{XorShiftRng, SeedableRng, Rand, Rng};
-    use crate::pairing::bn256::Bn256;
-    use num_cpus;
-
-    const SAMPLES: usize = 1 << 22;
-    let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-
-    let v = (0..SAMPLES).map(|_| <Bn256 as ScalarEngine>::Fr::rand(rng).into_repr()).collect::<Vec<_>>();
-    let g = (0..SAMPLES).map(|_| <Bn256 as Engine>::G1::rand(rng).into_affine()).collect::<Vec<_>>();
-
-    println!("Done generating test points and scalars");
-
-    let pool = Worker::new();
-    let start = std::time::Instant::now();
-
-    let _sparse = multiexp(
-        &pool,
-        (Arc::new(g), 0),
-        FullDensity,
-        Arc::new(v)
-    ).wait().unwrap();
-
-    let duration_ns = start.elapsed().as_nanos() as f64;
-    println!("{} ms for sparse for {} samples", duration_ns/1000.0f64, SAMPLES);
-}
-
-#[test]
-fn test_bench_dense_consuming_multiexp() {
-    use rand::{XorShiftRng, SeedableRng, Rand, Rng};
-    use crate::pairing::bn256::Bn256;
-    use num_cpus;
-
-    const SAMPLES: usize = 1 << 20;
-    let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-
-    let v = (0..SAMPLES).map(|_| <Bn256 as ScalarEngine>::Fr::rand(rng).into_repr()).collect::<Vec<_>>();
-    let g = (0..SAMPLES).map(|_| <Bn256 as Engine>::G1::rand(rng).into_affine()).collect::<Vec<_>>();
-
-    println!("Done generating test points and scalars");
-
-    let pool = Worker::new();
-
-    let g = Arc::new(g);
-    let v = Arc::new(v);
-
-    let start = std::time::Instant::now();
-
-    let _sparse = multiexp(
-        &pool,
-        (g.clone(), 0),
-        FullDensity,
-        v.clone()
-    ).wait().unwrap();
-
-    println!("{:?} for sparse for {} samples", start.elapsed(), SAMPLES);
-
-    let g = Arc::try_unwrap(g).unwrap();
-    let v = Arc::try_unwrap(v).unwrap();
-
-    let start = std::time::Instant::now();
-
-    let _dense = dense_multiexp_consume(
-        &pool,
-        &g,
-        v
-    ).unwrap();
-
-    println!("{:?} for dense for {} samples", start.elapsed(), SAMPLES);
+    #[test]
+    fn test_sizes_for_bn254() {
+        let sizes = vec![1<<23, 1<<24];
+        let cores = vec![8, 12, 16, 24, 32, 48];
+        for size in sizes {
+            for &core in &cores {
+                calculate_parameters(size, core, 254);
+            }
+        }
+    }
 }

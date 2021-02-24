@@ -24,7 +24,7 @@ use std::num::Wrapping;
 
 const MODULUS_R: Wrapping<u32> = Wrapping(64513);
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Fr(Wrapping<u32>);
 
 impl fmt::Display for Fr {
@@ -160,7 +160,7 @@ impl SqrtField for Fr {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct FrRepr([u64; 1]);
 
 impl Ord for FrRepr {
@@ -294,7 +294,7 @@ impl PrimeField for Fr {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DummyEngine;
 
 impl ScalarEngine for DummyEngine {
@@ -490,7 +490,7 @@ impl CurveAffine for Fr {
         (&self, &self)
     }
 
-    fn into_xy_unchecked(&self) -> (Self::Base, Self::Base) {
+    fn into_xy_unchecked(self) -> (Self::Base, Self::Base) {
         (<Fr as Field>::zero(), <Fr as Field>::zero())
     }
 
@@ -500,5 +500,13 @@ impl CurveAffine for Fr {
 
     fn from_xy_checked(_x: Self::Base, _y: Self::Base) -> Result<Self, GroupDecodingError> {
         Ok(<Fr as Field>::zero())
+    }
+
+    fn a_coeff() -> <Self as pairing::CurveAffine>::Base { 
+        <Fr as Field>::zero()
+    }
+
+    fn b_coeff() -> <Self as pairing::CurveAffine>::Base { 
+        <Fr as Field>::zero()
     }
 }

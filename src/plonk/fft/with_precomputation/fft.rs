@@ -1,5 +1,5 @@
 use crate::pairing::ff::PrimeField;
-use crate::multicore::*;
+use crate::worker::*;
 use super::FftPrecomputations;
 
 fn log2_floor(num: usize) -> u32 {

@@ -359,11 +359,8 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         let required_domain_size = n + 1;
         assert!(required_domain_size.is_power_of_two());
 
-        let domain = Domain::new_for_size(required_domain_size as u64)?;
-
         let non_residues = make_non_residues::<E::Fr>(
-            <PlonkCsWidth4WithNextStepParams as PlonkConstraintSystemParams<E>>::STATE_WIDTH - 1, 
-            &domain
+            <PlonkCsWidth4WithNextStepParams as PlonkConstraintSystemParams<E>>::STATE_WIDTH - 1
         );
 
         let full_assignments = self.make_witness_polynomials()?;
@@ -433,11 +430,8 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         let required_domain_size = n + 1;
         assert!(required_domain_size.is_power_of_two());
 
-        let domain = Domain::new_for_size(required_domain_size as u64)?;
-
         let non_residues = make_non_residues::<E::Fr>(
-            <PlonkCsWidth4WithNextStepParams as PlonkConstraintSystemParams<E>>::STATE_WIDTH - 1, 
-            &domain
+            <PlonkCsWidth4WithNextStepParams as PlonkConstraintSystemParams<E>>::STATE_WIDTH - 1
         );
 
         let full_assignments = self.make_witness_polynomials()?;
@@ -860,11 +854,8 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
         assert!(z_shifted_coset_lde_bitreversed.size() == required_domain_size*LDE_FACTOR);
 
-        let domain = Domain::new_for_size(required_domain_size as u64)?;
-
         let non_residues = make_non_residues::<E::Fr>(
-            <PlonkCsWidth4WithNextStepParams as PlonkConstraintSystemParams<E>>::STATE_WIDTH - 1, 
-            &domain
+            <PlonkCsWidth4WithNextStepParams as PlonkConstraintSystemParams<E>>::STATE_WIDTH - 1
         );
 
         // For both Z_1 and Z_2 we first check for grand products

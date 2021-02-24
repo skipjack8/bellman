@@ -1,8 +1,5 @@
-// #![feature(core_intrinsics)]
+#![ allow( dead_code, unused_imports, unused_mut, unused_variables, unused_macros, unused_assignments, unreachable_patterns ) ]
 
-#![allow(unused_imports)]
-#![allow(unused_macros)]
-#![allow(dead_code)]
 #[macro_use]
 
 extern crate cfg_if;
@@ -41,6 +38,7 @@ pub mod marlin;
 #[cfg(any(feature = "marlin", feature = "plonk"))]
 pub mod kate_commitment;
 
+pub mod constants;
 mod group;
 mod source;
 mod multiexp;
@@ -56,12 +54,12 @@ cfg_if! {
 
         mod multicore;
         pub mod worker {
-            pub use crate::multicore::*;
+            pub use super::multicore::*;
         }
     } else {
         mod singlecore;
         pub mod worker {
-            pub use crate::singlecore::*;
+            pub use super::singlecore::*;
         }
     }
 }

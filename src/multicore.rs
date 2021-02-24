@@ -39,7 +39,7 @@ impl Worker {
     }
 
     pub fn new() -> Worker {
-        Self::new_with_cpus(num_cpus::get())
+        Self::new_with_cpus(num_cpus::get_physical())
     }
 
     pub fn log_num_cpus(&self) -> u32 {
@@ -92,7 +92,7 @@ impl Worker {
         let chunk_size = if elements <= self.cpus {
             1
         } else {
-            elements / self.cpus
+            Self::chunk_size_for_num_spawned_threads(elements, self.cpus)
         };
 
         chunk_size

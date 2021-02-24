@@ -21,13 +21,28 @@ use crate::plonk::commitments::transcript::*;
 pub fn verify<E: Engine, P: PlonkConstraintSystemParams<E>, T: Transcript<E::Fr>>(
     proof: &Proof<E, P>,
     verification_key: &VerificationKey<E, P>,
+    transcript_init_params: Option< <T as Prng<E::Fr> >:: InitializationParameters>,
 ) -> Result<bool, SynthesisError> {
+    let (valid, _) = verify_and_aggregate::<E, P, T>(proof, verification_key, transcript_init_params)?;
+
+    Ok(valid)
+}
+
+pub fn verify_and_aggregate<E: Engine, P: PlonkConstraintSystemParams<E>, T: Transcript<E::Fr>>(
+    proof: &Proof<E, P>,
+    verification_key: &VerificationKey<E, P>,
+    transcript_init_params: Option< <T as Prng<E::Fr> >:: InitializationParameters>,
+) -> Result<(bool, [E::G1Affine; 2]), SynthesisError> {
     use crate::pairing::CurveAffine;
     use crate::pairing::CurveProjective;
 
     assert!(P::CAN_ACCESS_NEXT_TRACE_STEP);
 
-    let mut transcript = T::new();
+    let mut transcript = if let Some(p) = transcript_init_params {
+        T::new_from_params(p)
+    } else {
+        T::new()
+    };
 
     if proof.n != verification_key.n {
         return Err(SynthesisError::MalformedVerifyingKey);
@@ -48,7 +63,7 @@ pub fn verify<E: Engine, P: PlonkConstraintSystemParams<E>, T: Transcript<E::Fr>
     let selector_q_const_index = P::STATE_WIDTH + 1;
     let selector_q_m_index = P::STATE_WIDTH;
 
-    let non_residues = make_non_residues::<E::Fr>(P::STATE_WIDTH - 1, &domain);
+    let non_residues = make_non_residues::<E::Fr>(P::STATE_WIDTH - 1);
 
     // Commit public inputs
     for inp in proof.input_values.iter() {
@@ -94,6 +109,8 @@ pub fn verify<E: Engine, P: PlonkConstraintSystemParams<E>, T: Transcript<E::Fr>
     transcript.commit_field_element(&proof.quotient_polynomial_at_z);
 
     transcript.commit_field_element(&proof.linearization_polynomial_at_z);
+
+    transcript.commit_field_element(&proof.grand_product_at_z_omega);
 
 
     // do the actual check for relationship at z
@@ -151,7 +168,7 @@ pub fn verify<E: Engine, P: PlonkConstraintSystemParams<E>, T: Transcript<E::Fr>
         rhs.sub_assign(&l_0_at_z);
 
         if lhs != rhs {
-            return Ok(false);
+            return Ok((false, [E::G1Affine::zero(); 2]));
         }
     }
 
@@ -299,6 +316,7 @@ pub fn verify<E: Engine, P: PlonkConstraintSystemParams<E>, T: Transcript<E::Fr>
 
     // do the same for linearization
     multiopening_challenge.mul_assign(&v); // to preserve sequence
+
     commitments_aggregation.add_assign(&virtual_commitment_for_linearization_poly); // v^1 is contained inside
 
     debug_assert_eq!(multiopening_challenge, v.pow(&[1 as u64]));
@@ -384,12 +402,15 @@ pub fn verify<E: Engine, P: PlonkConstraintSystemParams<E>, T: Transcript<E::Fr>
     pair_with_x.add_assign_mixed(&proof.opening_at_z_proof);
     pair_with_x.negate();
 
+    let pair_with_generator = pair_with_generator.into_affine();
+    let pair_with_x = pair_with_x.into_affine();
+
     let valid = E::final_exponentiation(
         &E::miller_loop(&[
-            (&pair_with_generator.into_affine().prepare(), &verification_key.g2_elements[0].prepare()),
-            (&pair_with_x.into_affine().prepare(), &verification_key.g2_elements[1].prepare())
+            (&pair_with_generator.prepare(), &verification_key.g2_elements[0].prepare()),
+            (&pair_with_x.prepare(), &verification_key.g2_elements[1].prepare())
         ])
     ).unwrap() == E::Fqk::one();
 
-    Ok(valid)
+    Ok((valid, [pair_with_generator, pair_with_x]))
 }

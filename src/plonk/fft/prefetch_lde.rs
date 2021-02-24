@@ -1,5 +1,5 @@
 use crate::ff::PrimeField;
-use crate::multicore::*;
+use crate::worker::*;
 use super::prefetch::*;
 
 fn log2_floor(num: usize) -> u32 {

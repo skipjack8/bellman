@@ -32,7 +32,7 @@ use crate::domain::{
     Scalar
 };
 
-use crate::multicore::{
+use crate::worker::{
     Worker
 };
 

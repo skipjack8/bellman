@@ -282,13 +282,18 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         crs_vals: &Crs<E, CrsForLagrangeForm>, 
         crs_mon: &Crs<E, CrsForMonomialForm>,
         omegas_bitreversed: &CP,
-        omegas_inv_bitreversed: &CPI
+        omegas_inv_bitreversed: &CPI,
+        transcript_init_params: Option< <T as Prng<E::Fr> >:: InitializationParameters>,
     ) -> Result<Proof<E, PlonkCsWidth4WithNextStepParams>, SynthesisError> {
         use crate::pairing::CurveAffine;
         use std::sync::Arc;
 
-        let mut transcript = T::new();
-
+        let mut transcript = if let Some(p) = transcript_init_params {
+            T::new_from_params(p)
+        } else {
+            T::new()
+        };
+            
         assert!(self.is_finalized);
 
         let input_values = self.input_assingments.clone();
@@ -363,8 +368,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
         domain_elements_poly_by_beta.scale(&worker, beta);
 
         let non_residues = make_non_residues::<E::Fr>(
-            <PlonkCsWidth4WithNextStepParams as PlonkConstraintSystemParams<E>>::STATE_WIDTH - 1, 
-            &domain
+            <PlonkCsWidth4WithNextStepParams as PlonkConstraintSystemParams<E>>::STATE_WIDTH - 1
         );
 
         // we take A, B, C, ... values and form (A + beta * X * non_residue + gamma), etc and calculate their grand product
@@ -795,6 +799,8 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
 
         transcript.commit_field_element(&proof.linearization_polynomial_at_z);
 
+        transcript.commit_field_element(&proof.grand_product_at_z_omega);
+
         // sanity check - verification
         {
             let mut lhs = t_at_z;
@@ -1175,9 +1181,10 @@ mod test {
             &crs_mons,
             &omegas_bitreversed,
             &omegas_inv_bitreversed,
+            None,
         ).unwrap();
 
-        let is_valid = verify::<Bn256, PlonkCsWidth4WithNextStepParams, Transcr>(&proof, &verification_key).unwrap();
+        let is_valid = verify::<Bn256, PlonkCsWidth4WithNextStepParams, Transcr>(&proof, &verification_key, None).unwrap();
 
         assert!(is_valid);
 

@@ -1,4 +1,4 @@
-use crate::multicore::*;
+use crate::worker::*;
 use crate::pairing::ff::PrimeField;
 
 pub(crate) fn convert_to_field_elements<F: PrimeField>(indexes: &[usize], worker: &Worker) -> Vec<F> {

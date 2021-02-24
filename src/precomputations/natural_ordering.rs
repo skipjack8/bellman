@@ -1,7 +1,7 @@
 use crate::pairing::ff::PrimeField;
 
 use crate::plonk::domains::Domain;
-use crate::multicore::Worker;
+use crate::worker::Worker;
 use crate::plonk::fft::distribute_powers;
 use crate::plonk::fft::with_precomputation::FftPrecomputations;
 

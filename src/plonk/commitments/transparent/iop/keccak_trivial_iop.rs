@@ -1,6 +1,6 @@
 use crate::pairing::ff::{PrimeField, PrimeFieldRepr};
 use tiny_keccak::*;
-use crate::multicore::Worker;
+use crate::worker::Worker;
 use super::super::utils::log2_floor;
 use super::*;
 use super::trivial_coset_combiner::*;

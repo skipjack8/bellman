@@ -2,7 +2,7 @@ use crate::pairing::ff::PrimeField;
 use crate::plonk::commitments::transparent::iop_compiler::*;
 use crate::plonk::commitments::transparent::iop_compiler::coset_combining_blake2s_tree::*;
 use crate::plonk::polynomials::*;
-use crate::multicore::*;
+use crate::worker::*;
 use crate::SynthesisError;
 use crate::plonk::commitments::transparent::utils::log2_floor;
 use crate::plonk::commitments::transcript::Prng;
@@ -397,7 +397,7 @@ mod test {
         use crate::plonk::transparent_engine::PartialTwoBitReductionField;
         use crate::plonk::polynomials::*;
         use std::time::Instant;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::cooley_tukey_ntt::{CTPrecomputations, BitReversedOmegas, OmegasInvBitreversed};
         use crate::plonk::commitments::transparent::fri::coset_combining_fri::FriPrecomputations;
@@ -448,7 +448,7 @@ mod test {
         use crate::plonk::transparent_engine::PartialTwoBitReductionField;
         use crate::plonk::polynomials::*;
         use std::time::Instant;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::cooley_tukey_ntt::{CTPrecomputations, BitReversedOmegas, OmegasInvBitreversed};
         use crate::plonk::commitments::transparent::fri::coset_combining_fri::FriPrecomputations;

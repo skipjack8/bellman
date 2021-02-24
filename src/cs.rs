@@ -184,8 +184,9 @@ impl From<io::Error> for SynthesisError {
     }
 }
 
-impl Error for SynthesisError {
-    fn description(&self) -> &str {
+
+impl SynthesisError {
+    pub fn self_description(&self) -> &str {
         match *self {
             SynthesisError::AssignmentMissing => "an assignment for a variable could not be computed",
             SynthesisError::DivisionByZero => "division by zero",
@@ -199,13 +200,19 @@ impl Error for SynthesisError {
     }
 }
 
+impl Error for SynthesisError {
+    fn description(&self) -> &str {
+        self.self_description()
+    }
+}
+
 impl fmt::Display for SynthesisError {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         if let &SynthesisError::IoError(ref e) = self {
             write!(f, "I/O error: ")?;
             e.fmt(f)
         } else {
-            write!(f, "{}", self.to_string())
+            write!(f, "{}", self.self_description())
         }
     }
 }

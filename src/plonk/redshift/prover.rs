@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use crate::plonk::cs::gates::*;
 use crate::plonk::cs::*;
 
-use crate::multicore::*;
+use crate::worker::*;
 use crate::plonk::domains::*;
 use crate::plonk::commitments::*;
 use crate::plonk::commitments::transcript::*;
@@ -1711,7 +1711,7 @@ mod test {
         use crate::plonk::commitments::transparent::iop_compiler::*;
         use crate::plonk::commitments::transcript::*;
         use crate::plonk::commitments::*;
-        use crate::multicore::Worker;
+        use crate::worker::Worker;
         // use crate::plonk::tester::*;
 
         type Fr = <Transparent252 as ScalarEngine>::Fr;
@@ -1835,7 +1835,7 @@ mod test {
         use crate::plonk::transparent_engine::{TransparentEngine, PartialTwoBitReductionField};
         use crate::plonk::transparent_engine::proth_engine::Transparent252;
 
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::source::*;
 
         type Fr = <Transparent252 as ScalarEngine>::Fr;
@@ -1876,7 +1876,7 @@ mod test {
         use crate::plonk::transparent_engine::{TransparentEngine};
         use crate::plonk::transparent_engine::proth_engine::Transparent252;
 
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::source::*;
 
         type Fr = <Transparent252 as ScalarEngine>::Fr;

@@ -1,7 +1,7 @@
 use crate::ff::PrimeField;
 
 use crate::plonk::domains::Domain;
-use crate::multicore::Worker;
+use crate::worker::Worker;
 use crate::plonk::fft::distribute_powers;
 use super::*;
 use crate::plonk::fft::cooley_tukey_ntt::{bitreverse, log2_floor};

@@ -10,7 +10,7 @@ use std::marker::PhantomData;
 
 use super::cs::*;
 use super::keys::SetupPolynomials;
-use super::utils::{make_non_residues};
+pub use super::utils::{make_non_residues};
 
 #[derive(Debug, Clone)]
 pub struct GeneratorAssembly<E: Engine, P: PlonkConstraintSystemParams<E>> {
@@ -309,7 +309,7 @@ impl<E: Engine> GeneratorAssembly4WithNextStep<E> {
 
         let mut non_residues = vec![];
         non_residues.push(E::Fr::one());
-        non_residues.extend(make_non_residues::<E::Fr>(3, &domain));
+        non_residues.extend(make_non_residues::<E::Fr>(3));
 
         assert_eq!(non_residues.len(), 4);
 
@@ -589,7 +589,7 @@ mod test {
         let omega = domain.generator;
 
         let mut non_res = vec![Fr::one()];
-        non_res.extend(make_non_residues::<Fr>(3, &domain));
+        non_res.extend(make_non_residues::<Fr>(3));
 
         let p = vec![
             (a, sigma_1, non_res[0]),

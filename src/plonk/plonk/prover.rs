@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use crate::plonk::cs::gates::*;
 use crate::plonk::cs::*;
 
-use crate::multicore::*;
+use crate::worker::*;
 use crate::plonk::domains::*;
 use crate::plonk::commitments::*;
 use crate::plonk::commitments::transcript::*;
@@ -1783,7 +1783,7 @@ mod test {
         use crate::pairing::{CurveProjective, CurveAffine};
         use crate::pairing::bls12_381::{Bls12, Fr};
         use crate::plonk::utils::*;
-        use crate::multicore::Worker;
+        use crate::worker::Worker;
         // use crate::plonk::tester::*;
 
         type Transcr = Blake2sTranscript<Fr>;
@@ -1919,7 +1919,7 @@ mod test {
         use crate::pairing::{CurveProjective, CurveAffine};
         use crate::pairing::bn256::{Bn256, Fr};
         use crate::plonk::utils::*;
-        use crate::multicore::Worker;
+        use crate::worker::Worker;
         // use crate::plonk::tester::*;
 
         type Transcr = Blake2sTranscript<Fr>;

@@ -1,5 +1,5 @@
 use crate::pairing::ff::PrimeField;
-use crate::multicore::*;
+use crate::worker::*;
 
 pub(crate) fn best_lde<F: PrimeField>(a: &mut [F], worker: &Worker, omega: &F, log_n: u32, lde_factor: usize)
 {

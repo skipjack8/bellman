@@ -80,10 +80,21 @@ pub const BLOCKBYTES: usize = 16 * size_of::<Word>();
 #[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), target_feature = "avx2"))]
 const EMPTY_PARAMS: Params = Params::new_for_implementation(Implementation(Platform::AVX2));
 
-#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), target_feature = "sse4.1"))]
+#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), all(not(target_feature = "avx2"),target_feature = "sse4.1")))]
 const EMPTY_PARAMS: Params = Params::new_for_implementation(Implementation(Platform::SSE41));
 
-#[cfg(any(not(all(target_arch = "x86", target_arch = "x86_64")), not(all(target_feature = "avx2", target_feature = "sse4.1")), not))]
+#[cfg(not(
+    any(
+        all(
+            any(target_arch = "x86", target_arch = "x86_64"),
+            target_feature = "avx2"
+        ),
+        all(
+            any(target_arch = "x86", target_arch = "x86_64"), 
+            target_feature = "sse4.1"
+        ),
+    )
+))]
 const EMPTY_PARAMS: Params = Params::new_for_implementation(Implementation(Platform::Portable));
 
 const EMPTY_WORDS: [Word; 8] = EMPTY_PARAMS.empty_words();

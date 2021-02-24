@@ -26,6 +26,7 @@ impl<F: PrimeField> StatelessBlake2sPrng<F> {
 
 impl<F: PrimeField> Prng<F> for StatelessBlake2sPrng<F> {
     type Input = F;
+    type InitializationParameters = ();
 
     fn new() -> Self {
         assert!(F::NUM_BITS < 256);

@@ -64,7 +64,7 @@ mod test {
         use super::proth::Fr as FrOptimized;
         use crate::plonk::polynomials::*;
         use std::time::Instant;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
 
         let poly_sizes = vec![1_000_000, 2_000_000, 4_000_000];
@@ -134,7 +134,7 @@ mod test {
         use super::proth::Fr as FrOptimized;
         use crate::plonk::polynomials::*;
         use std::time::Instant;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::fft::best_fft;
         use crate::plonk::fft::with_precomputation::FftPrecomputations;
@@ -185,7 +185,7 @@ mod test {
         use super::proth::Fr as FrOptimized;
         use crate::plonk::polynomials::*;
         use std::time::Instant;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::with_precomputation::FftPrecomputations;
         use crate::plonk::commitments::transparent::precomputations::*;
@@ -231,7 +231,7 @@ mod test {
         use super::proth::Fr as Fr;
         use crate::plonk::polynomials::*;
         use std::time::Instant;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::cooley_tukey_ntt::{CTPrecomputations, BitReversedOmegas};
 
@@ -281,7 +281,7 @@ mod test {
     //     use super::proth::Fr as Fr;
     //     use crate::plonk::polynomials::*;
     //     use std::time::Instant;
-    //     use crate::multicore::*;
+    //     use crate::worker::*;
     //     use crate::plonk::commitments::transparent::utils::*;
     //     use crate::plonk::fft::cooley_tukey_ntt::{CTPrecomputations, BitReversedOmegas};
 
@@ -361,7 +361,7 @@ mod test {
         use super::PartialTwoBitReductionField;
         use crate::plonk::polynomials::*;
         use std::time::Instant;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::cooley_tukey_ntt::{CTPrecomputations, BitReversedOmegas};
 
@@ -410,7 +410,7 @@ mod test {
         use super::proth::Fr as Fr;
         use crate::plonk::polynomials::*;
         use std::time::Instant;
-        use crate::multicore::*;
+        use crate::worker::*;
         use crate::plonk::commitments::transparent::utils::*;
         use crate::plonk::fft::cooley_tukey_ntt::{CTPrecomputations, BitReversedOmegas, best_ct_ntt};
         use crate::plonk::fft::fft::best_fft;
