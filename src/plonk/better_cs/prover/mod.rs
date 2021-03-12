@@ -243,13 +243,13 @@ impl<E: Engine, P: PlonkConstraintSystemParams<E>> ProverAssembly<E, P> {
     ) -> Result<Vec<Vec<E::Fr>>, SynthesisError>
     {
         assert!(self.is_finalized);
-        //(inputs+aux) * n
+        //a: full_assignments[0], b:full_assignments[1],..d: full_assignments[3]
         let mut full_assignments = vec![Vec::with_capacity((self.n+1).next_power_of_two()); self.wire_assignments.len()];//4
 
         for inp in self.input_assingments.into_iter() {
             // inputs will always go into A wire
-            full_assignments[0].push(inp);
-            for i in 1..full_assignments.len() {
+            full_assignments[0].push(inp);//a
+            for i in 1..full_assignments.len() {//1,2,3
                 full_assignments[i].push(E::Fr::zero());
             }
         }

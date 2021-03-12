@@ -440,7 +440,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             &domain
         );
 
-        let full_assignments = self.make_witness_polynomials()?;
+        let full_assignments = self.make_witness_polynomials()?;//2^N-1
 
         // Commit wire polynomials 
         // Phase 1 start:
@@ -492,7 +492,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             non_residues,
             input_values: input_values.clone(),
             witness_polys_as_coeffs: wire_polys_as_coefficients,// a(x),b(x),c(x),d(x)系数
-            witness_polys_unpadded_values: assignment_polynomials,
+            witness_polys_unpadded_values: assignment_polynomials,// a,b,c,d的值
 
             _marker: std::marker::PhantomData
         };
@@ -514,7 +514,7 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
     ), SynthesisError>
     {
         let FirstVerifierMessage { beta, gamma, ..} = first_verifier_message;
-        // a(omega^j), b(omega^j), c(omega^j), d(omega^j),j=0,..,n
+        // a(omega^j), b(omega^j), c(omega^j), d(omega^j),j=0,..,n-2
         assert_eq!(first_state.witness_polys_unpadded_values.len(), 4, "first state must containt assignment poly values");
 
         let mut grand_products_protos_with_gamma = first_state.witness_polys_unpadded_values.clone();
@@ -549,7 +549,10 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             for (mut p, non_res) in grand_products_proto_it.zip(first_state.non_residues.iter()) {
                 p.add_assign_scaled(&worker, &domain_elements_poly_by_beta, non_res);
                 z_1.mul_assign(&worker, &p);
-            }//b(omega^j)+ non_res[0] * beta * omega^j + gamma, c(omega^j)+ non_res[1] * beta * omega^j + gamma, d(omega^j)+ non_res[2] * beta * omega^j + gamma,
+            } //z1 = (a(omega^j) + beta*omega^j + gamma)
+            // * (b(omega^j)+ k1 * beta * omega^j + gamma)
+            // * (c(omega^j)+ k2 * beta * omega^j + gamma)
+            // * (d(omega^j)+ k3 * beta * omega^j + gamma)
 
             z_1
         };//分子已经计算出来
@@ -587,14 +590,15 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             }
         }
 
-        let z_den = {
+        let z_den = {//置换多项式(perm_a(X),perm_b(X),perm_c(X),perm_d(X))的个数
+            // 与witness多项式(a(X),b(X),c(X),d(X))的个数一致，都是4
             assert_eq!(
                 permutation_polynomials_values_of_size_n_minus_one.len(), 
                 grand_products_protos_with_gamma.len()
             );
             let mut grand_products_proto_it = grand_products_protos_with_gamma.into_iter();
             let mut permutation_polys_it = permutation_polynomials_values_of_size_n_minus_one.iter();
-            // a(omega^j) + gamma + beta * sigma_1(omega^j)
+            // z2[j]=a(omega^j) + gamma + beta * perm_a(omega^j)
             let mut z_2 = grand_products_proto_it.next().unwrap();
             z_2.add_assign_scaled(&worker, permutation_polys_it.next().unwrap().as_ref(), &beta);
 
@@ -603,7 +607,10 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
                 // permutation polynomials 
                 p.add_assign_scaled(&worker, perm.as_ref(), &beta);
                 z_2.mul_assign(&worker, &p);
-            }//b(omega^j) + gamma + beta * sigma_2(omega^j)， c(omega^j) + gamma + beta * sigma_3(omega^j)， d(omega^j) + gamma + beta * sigma_4(omega^j)，
+            }//z2[j] = (a(omega^j) + gamma + beta * perm_a(omega^j))
+            // * (b(omega^j) + gamma + beta * perm_b(omega^j))
+            // * (c(omega^j) + gamma + beta * perm_c(omega^j))
+            // * (d(omega^j) + gamma + beta * perm_d(omega^j))
 
             z_2.batch_inversion(&worker)?;
 
@@ -1032,9 +1039,9 @@ impl<E: Engine> ProverAssembly4WithNextStep<E> {
             wire_values_at_z: vec![],//a(z),..,d(z)
             wire_values_at_z_omega: vec![],// Z(z*omega)
             permutation_polynomials_at_z: vec![],//perm_a(z),perm_d(z),perm_c(z)
-            grand_product_at_z_omega: E::Fr::zero(),
-            quotient_polynomial_at_z: E::Fr::zero(),
-            linearization_polynomial_at_z: E::Fr::zero(),
+            grand_product_at_z_omega: E::Fr::zero(),//Z(z*omega)
+            quotient_polynomial_at_z: E::Fr::zero(),//t(z)
+            linearization_polynomial_at_z: E::Fr::zero(),//r(z)
 
             _marker: std::marker::PhantomData
         };

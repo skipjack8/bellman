@@ -132,7 +132,7 @@ impl<F: PrimeField> OmegasInvBitreversed<F> {
                 }
             }
         }
-
+        // omega^j, j = 0,4,2,6,1,5,3,7
         OmegasInvBitreversed{
             omegas,
             domain_size

@@ -200,7 +200,7 @@ fn transpile_test_circuit() {
     assert!(prover.is_satisfied());
 }
 
-const MIMC_ROUNDS: usize = 1000000;
+const MIMC_ROUNDS: usize = 150;
 
 fn mimc<E: Engine>(
     mut xl: E::Fr,

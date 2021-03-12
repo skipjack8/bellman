@@ -2057,6 +2057,7 @@ fn convert_variable_back(plonk_variable: PlonkVariable) -> crate::Variable {
 }
 
 use std::cell::Cell;
+use std::time::Duration;
 
 pub struct AdaptorCircuit<'a, E:Engine, P: PlonkConstraintSystemParams<E>, C: crate::Circuit<E>>{
     circuit: Cell<Option<C>>,
@@ -2351,7 +2352,7 @@ fn transpile_xor_and_prove_with_no_precomputations_mimc() {
     use super::utils::make_non_residues;
     use rand::{thread_rng, Rng};
 
-    const MIMC_ROUNDS: usize = 10;
+    const MIMC_ROUNDS: usize = 150;
 
     let rng = &mut thread_rng();
 
@@ -2370,9 +2371,9 @@ fn transpile_xor_and_prove_with_no_precomputations_mimc() {
 
     let hints = transpiler.hints;
 
-    for (constraint_id, hint) in hints.iter() {
-        println!("Constraint {} into {:?}", constraint_id, hint);
-    }
+    // for (constraint_id, hint) in hints.iter() {
+    //     println!("Constraint {} into {:?}", constraint_id, hint);
+    // }
 
     // let c = XORDemo::<Bn256> {
     //     a: None,
@@ -2418,31 +2419,38 @@ fn transpile_xor_and_prove_with_no_precomputations_mimc() {
     println!("Non residues = {:?}", non_residues);
 
     type Transcr = RollingKeccakTranscript<Fr>;
+    let mut total_proving = Duration::new(0, 0);
+    let samples = 2;
+    for test_i in 0..samples {
+        println!("test {:?}\n", test_i);
+        let single_prove_time = super::super::prove_by_steps_wrapped::<_, _, Transcr>(
+            c.clone(),
+            &hints,
+            &setup,
+            None,
+            &crs_mons
+        ).unwrap();
 
-    let proof = super::super::prove_by_steps::<_, _, Transcr>(
-        c,
-        &hints,
-        &setup,
-        None,
-        &crs_mons
-    ).unwrap();
+        total_proving += single_prove_time;
+    }
 
-    let is_valid = verify::<Bn256, PlonkCsWidth4WithNextStepParams, Transcr>(&proof, &verification_key).unwrap();
+    let proving_avg = total_proving / samples;
+    let proving_avg = proving_avg.as_millis();
 
-    assert!(is_valid);
+    println!("Average proving time: {:?} ms", proving_avg);
 
     // println!("Verification key = {:?}", verification_key);
     // println!("Proof = {:?}", proof);
 
-    let mut key_writer = std::io::BufWriter::with_capacity(
-        1<<24,
-        std::fs::File::create("./xor_vk_mimc.key").unwrap()
-    );
-    verification_key.write(&mut key_writer).unwrap();
-
-    let mut proof_writer = std::io::BufWriter::with_capacity(
-        1<<24,
-        std::fs::File::create("./xor_proof_mimc.proof").unwrap()
-    );
-    proof.write(&mut proof_writer).unwrap();
+//     let mut key_writer = std::io::BufWriter::with_capacity(
+//         1<<24,
+//         std::fs::File::create("./xor_vk_mimc.key").unwrap()
+//     );
+//     verification_key.write(&mut key_writer).unwrap();
+//
+//     let mut proof_writer = std::io::BufWriter::with_capacity(
+//         1<<24,
+//         std::fs::File::create("./xor_proof_mimc.proof").unwrap()
+//     );
+//     proof.write(&mut proof_writer).unwrap();
 }
